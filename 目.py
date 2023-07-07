@@ -6,7 +6,7 @@ import 手
 
 
 start_prob = sys.argv[1] if len(sys.argv) >= 2 else None
-pixel_size = 1 # negative = division
+pixel_size = 1
 
 
 root = tk.Tk()
@@ -32,8 +32,8 @@ def on_press(event) -> None:
 root.bind('<Key>', on_press)
 
 
+prob = None
 prob_ids = 手.all_prob_ids()
-
 
 prob_var = tk.StringVar()
 prob_cb = ttk.Combobox(root, textvariable=prob_var)
@@ -46,6 +46,7 @@ prob_cb['state'] = 'readonly'
 prob_cb.pack()
 
 
+sol = None
 sol_ids = []
 
 sol_var = tk.StringVar()
@@ -59,10 +60,8 @@ top_label = tk.Label(root)
 top_label.pack()
 
 
-canvas_w = 1000
-canvas_h = 1000
-canvas = tk.Canvas(root, width=canvas_w, height=canvas_h)
-canvas.pack(fill=tk.BOTH)
+canvas = tk.Canvas(root, width=0, height=0)
+canvas.pack(fill=tk.BOTH, expand=tk.YES)
 
 
 coord_label = tk.Label(root)
@@ -85,12 +84,9 @@ def tk_color_from_rgba(rgba) -> str:
     return f'#{r:02x}{g:02x}{b:02x}'
 
 
-def project_coord(x: float, y: float) -> tuple[int, int]:
-    if pixel_size > 0:
-        return (round(x*pixel_size), canvas_h - round(y*pixel_size))
-    if pixel_size < 0:
-        return (round(x/-pixel_size), canvas_h - round(y/-pixel_size))
-    assert(False)
+def project_coord(x: float, y: float) -> tuple[float, float]:
+    ch = canvas.winfo_height()
+    return (x*pixel_size, ch - (y*pixel_size))
 
 
 def on_mouse_move(event) -> None:
@@ -100,28 +96,14 @@ def on_mouse_move(event) -> None:
 canvas.bind("<Motion>", on_mouse_move)
 
 
-def fit_pixel_size(w: float, h: float) -> int:
-    size = 1
-    while size*w <= canvas_w and size*h <= canvas_h:
-        size += 1
-    while size > 1 and (size*w > canvas_w or size*h > canvas_h):
-        size -= 1
-    if size == 1 and (size*w > canvas_w or size*h > canvas_h):
-        while w/size > canvas_w or h/size > canvas_h:
-            size += 1
-        return -size
-    return size
-
-
 def draw_prob(prob) -> None:
-    global pixel_size
     canvas.delete('prob')
-
-    rw = prob['room_width']
-    rh = prob['room_height']
-    pixel_size = fit_pixel_size(rw, rh)
+    if prob is None:
+        return
 
     # room
+    rw = prob['room_width']
+    rh = prob['room_height']
     (x0, y0) = project_coord(0, 0)
     (x1, y1) = project_coord(rw, rh)
     canvas.create_rectangle(
@@ -145,16 +127,16 @@ def draw_prob(prob) -> None:
         x = a['x']
         y = a['y']
         (x0, y0) = project_coord(x, y)
-        (x1, y1) = project_coord(x+1, y+1)
         canvas.create_rectangle(
-            x0, y0, x1, y1,
+            x0, y0, x0+2, y0+2,
             fill='black', width=0, tags='prob'
         )
 
 
 def draw_sol(sol) -> None:
     canvas.delete('sol')
-
+    if sol is None:
+        return
     for m in sol['placements']:
         x = m['x']
         y = m['y']
@@ -164,6 +146,31 @@ def draw_sol(sol) -> None:
             x0, y0, x1, y1,
             fill='black', width=0, tags='sol'
         )
+
+
+def fit_pixel_size(w: float, h: float) -> None:
+    global pixel_size
+    cw = canvas.winfo_width()
+    ch = canvas.winfo_height()
+    pixel_size = min(cw/w, ch/h)
+
+
+def fit_pixel_size_to_prob(prob) -> None:
+    if prob is None:
+        return
+    rw = prob['room_width']
+    rh = prob['room_height']
+    fit_pixel_size(rw, rh)
+
+
+def on_resize(event):
+    old_pixel_size = pixel_size
+    fit_pixel_size_to_prob(prob)
+    if pixel_size != old_pixel_size:
+        draw_prob(prob)
+        draw_sol(sol)
+
+canvas.bind('<Configure>', on_resize)
 
 
 def update_top_label(prob) -> None:
@@ -179,6 +186,7 @@ def update_top_label(prob) -> None:
 
 
 def switch_sol(sol_tag: str) -> None:
+    global sol
     if sol_tag == '':
         return
     prob_id = int(prob_cb.get())
@@ -189,9 +197,10 @@ def switch_sol(sol_tag: str) -> None:
 
 
 def switch_prob(prob_id: int) -> None:
-    global sol_ids
+    global sol_ids, prob
 
     prob = 手.get_prob(prob_id)
+    fit_pixel_size_to_prob(prob)
     draw_prob(prob)
     update_top_label(prob)
 
@@ -213,7 +222,6 @@ prob_cb.bind('<<ComboboxSelected>>', prob_changed)
 
 
 def sol_changed(event) -> None:
-    # todo
     switch_sol(sol_cb.get())
 
 sol_cb.bind('<<ComboboxSelected>>', sol_changed)
