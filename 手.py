@@ -19,6 +19,10 @@ api_key = (
 prob_count = 45
 
 
+def all_prob_ids() -> list[int]:
+    return [ i+1 for i in range(prob_count) ]
+
+
 def get_prob_request(id: int) -> dict:
     res = subprocess.check_output(
         ['curl',
@@ -46,22 +50,20 @@ def download_and_save_problem(id: int):
         print(f'Saved to {fname}')
 
 
-def all_prob_ids() -> list[int]:
-    return [ i+1 for i in range(prob_count) ]
-
-
-def read_prob(id: int) -> dict:
+def get_prob(id: int) -> dict:
     fname = get_prob_path(id)
     with io.open(fname, 'r') as h:
         return json.loads(h.read())
 
 
 def print_prob_stats(id: int) -> dict:
-    prob = read_prob(id)
-    print(f'{id}.problem:')
-    print(f'musician_count: {len(prob["musicians"])}')
-    print(f'instument_count: {len(set(prob["musicians"]))}')
-    print(f'attendee_count: {len(prob["attendees"])}')
+    p = get_prob(id)
+    print(f'{id}.plem:')
+    print(f'musician_count: {len(p["musicians"])}')
+    print(f'instument_count: {len(set(p["musicians"]))}')
+    print(f'attendee_count: {len(p["attendees"])}')
+    print(f'room_size: {p["room_width"]}x{p["room_height"]}')
+    print(f'stage_size: {p["stage_width"]}x{p["stage_height"]}')
     print()
 
 
