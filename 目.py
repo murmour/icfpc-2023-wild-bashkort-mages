@@ -46,8 +46,7 @@ prob_cb['state'] = 'readonly'
 prob_cb.pack()
 
 
-# sol_ids = 手.get_all_sol_ids()
-cur_sol_ids = []
+sol_ids = []
 
 sol_var = tk.StringVar()
 sol_cb = ttk.Combobox(root, textvariable=sol_var)
@@ -121,7 +120,6 @@ def draw_prob(prob) -> None:
     rw = prob['room_width']
     rh = prob['room_height']
     pixel_size = fit_pixel_size(rw, rh)
-    print(pixel_size)
 
     # room
     (x0, y0) = project_coord(0, 0)
@@ -147,10 +145,24 @@ def draw_prob(prob) -> None:
         x = a['x']
         y = a['y']
         (x0, y0) = project_coord(x, y)
-        (x1, y1) = project_coord(x, y)
+        (x1, y1) = project_coord(x+1, y+1)
         canvas.create_rectangle(
             x0, y0, x1, y1,
             fill='black', width=0, tags='prob'
+        )
+
+
+def draw_sol(sol) -> None:
+    canvas.delete('sol')
+
+    for m in sol['placements']:
+        x = m['x']
+        y = m['y']
+        (x0, y0) = project_coord(x, y)
+        (x1, y1) = project_coord(x+1, y+1)
+        canvas.create_rectangle(
+            x0, y0, x1, y1,
+            fill='black', width=0, tags='sol'
         )
 
 
@@ -166,14 +178,31 @@ def update_top_label(prob) -> None:
     top_label.config(text=text)
 
 
-def switch_prob(prob_id: int) -> None:
-    prob = 手.get_prob(prob_id)
-    draw_prob(prob)
-    update_top_label(prob)
+def switch_sol(sol_tag: str) -> None:
+    if sol_tag == '':
+        return
+    prob_id = int(prob_cb.get())
+    sol = 手.get_sol(prob_id, sol_tag)
+    draw_sol(sol)
+
     coord_label.focus_set()
 
 
-def switch_sol(sol_id) -> None:
+def switch_prob(prob_id: int) -> None:
+    global sol_ids
+
+    prob = 手.get_prob(prob_id)
+    draw_prob(prob)
+    update_top_label(prob)
+
+    sol_ids = 手.get_sol_tags(prob_id)
+    sol_cb['values'] = sol_ids
+    if len(sol_ids) == 0:
+        sol_cb.set('')
+    else:
+        sol_cb.current(0)
+    switch_sol(sol_cb.get())
+
     coord_label.focus_set()
 
 
@@ -216,24 +245,24 @@ def prev_prob() -> None:
 
 @key('Next')
 def next_sol() -> None:
-    if cur_sol_ids == []:
+    if sol_ids == []:
         return
     name = sol_cb.get()
-    pi = cur_sol_ids.index(name)
-    next_pi = (pi+1) % len(cur_sol_ids)
-    next_id = cur_sol_ids[next_pi]
+    pi = sol_ids.index(name)
+    next_pi = (pi+1) % len(sol_ids)
+    next_id = sol_ids[next_pi]
     sol_cb.set(next_id)
     switch_sol(next_id)
 
 
 @key('Prior')
 def prev_sol() -> None:
-    if cur_sol_ids == []:
+    if sol_ids == []:
         return
     name = sol_cb.get()
-    pi = cur_sol_ids.index(name)
-    next_pi = (pi-1) % len(cur_sol_ids)
-    next_id = cur_sol_ids[next_pi]
+    pi = sol_ids.index(name)
+    next_pi = (pi-1) % len(sol_ids)
+    next_id = sol_ids[next_pi]
     sol_cb.set(next_id)
     switch_sol(next_id)
 

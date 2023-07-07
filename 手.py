@@ -37,6 +37,10 @@ def get_prob_request(id: int) -> dict:
 
 def get_prob_path(id: int) -> str:
     path = f'問/{id}.problem'
+
+
+def get_sol_dir_path(prob_id: int) -> str:
+    path = f'答/{prob_id}'
     assert(os.path.exists(path))
     return path
 
@@ -52,6 +56,20 @@ def download_and_save_problem(id: int):
 
 def get_prob(id: int) -> dict:
     fname = get_prob_path(id)
+    with io.open(fname, 'r') as h:
+        return json.loads(h.read())
+
+
+def get_sol_tags(id: int) -> list:
+    sols_dir = get_sol_dir_path(id)
+    tags = [ f[:-9] for f in os.listdir(sols_dir) if f.endswith('.solution') ]
+    tags.sort()
+    return tags
+
+
+def get_sol(id: int, tag: str) -> dict:
+    sols_dir = get_sol_dir_path(id)
+    fname = f'{sols_dir}/{tag}.solution'
     with io.open(fname, 'r') as h:
         return json.loads(h.read())
 
