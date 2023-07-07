@@ -400,7 +400,7 @@ pair<Solution, double> solve_assignment(const Problem &p, const Solution &places
 Solution get_some_placement(const Problem &p) {
 	cerr << "get some placement\n";
     int n = (int)p.musicians.size();
-    for (int i = 1; i <= n; n++) { // n rows
+    for (int i = 1; i <= n; i++) { // n rows
         int j = (n + i - 1) / i ; // n cols
         if (10 * i + 10 > p.stage_height || 10 * j + 10 > p.stage_width) continue;
         double dx = p.stage_width / (j + 1);
