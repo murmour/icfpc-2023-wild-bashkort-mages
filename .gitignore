@@ -1,0 +1,10 @@
+__pycache__
+py/cache
+.vs
+Debug
+Release
+x64
+問
+答
+*.o
+脳/脳
