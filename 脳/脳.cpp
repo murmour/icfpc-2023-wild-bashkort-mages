@@ -76,6 +76,7 @@ bool is_valid( const Problem & problem, const Solution & sol )
 
 bool is_blocked( T A, T B, T C, double R )
 {
+	//return false;
 	double dx1 = B.x - A.x, dy1 = B.y - A.y;
 	double dx2 = C.x - A.x, dy2 = C.y - A.y;
 	double cross1 = dx1*dx2 + dy1*dy2;
@@ -85,9 +86,9 @@ bool is_blocked( T A, T B, T C, double R )
 	if (cross2 <= 0.) return false;
 	double S = abs( dx1*dy2 - dx2*dy1 );
 	double d2 = dx1*dx1 + dy1*dy1;
-	// R <= S / sqrt(d2)
-	// R*R <= S*S / d2
-	return R*R*d2 <= S*S;
+	// R => h = S / sqrt(d2)
+	// R*R => S*S / d2
+	return R*R*d2 >= S*S;
 }
 
 vector< int > get_blocked_stupid( const Problem & problem, const Solution & sol, int mus_id )
@@ -268,16 +269,16 @@ vector< int > get_blocked2( const Problem & problem, const Solution & sol, int m
 	return res;
 }
 
-long long get_score( const Problem & problem, const Solution & sol )
+double get_score( const Problem & problem, const Solution & sol )
 {
 	int n = (int)problem.musicians.size();
 	int m = (int)problem.attendees.size();
-	long long score = 0;
+	double score = 0;
 
 	for (int i=0; i<n; i++)
 	{
 		T A = T( sol.placements[i].x, sol.placements[i].y );
-		vector< int > blocked = get_blocked2( problem, sol, i );
+		vector< int > blocked = get_blocked_stupid( problem, sol, i );
 		for (int j=0; j<m; j++)
 			if (blocked[j]==0)
 			{
@@ -285,7 +286,7 @@ long long get_score( const Problem & problem, const Solution & sol )
 				double dx = A.x - B.x, dy = A.y - B.y;
 				double d2 = dx*dx + dy*dy;
 				double tmp = 1'000'000 * problem.attendees[j].tastes[problem.musicians[i]];
-				score += (long long)( ceil( tmp / d2 ) + 0.1 );
+				score += ceil( tmp / d2 );
 			}
 	}
 	return score;
@@ -385,7 +386,7 @@ pair<Solution, double> solve_assignment(const Problem &p, const Solution &places
                 double d2 = Sqr(places.placements[j].x - p.attendees[k].x) + Sqr(places.placements[j].y - p.attendees[k].y);
                 t += ceil(1000000 * p.attendees[k].tastes[inst] / d2);
             }
-            mat[i][j] = t;
+            mat[i][j] = -t;
         }
     auto ass = get_optimal_assignment(mat);
     Solution res;
@@ -394,12 +395,14 @@ pair<Solution, double> solve_assignment(const Problem &p, const Solution &places
         res.placements.push_back(places.placements[ass[i]]);
         score += mat[i][ass[i]];
     }
-    return {res, score};
+    return {res, -score};
 }
 
 Solution get_some_placement(const Problem &p) {
 	cerr << "get some placement\n";
     int n = (int)p.musicians.size();
+	double sx = p.stage_bottom_left[0];
+	double sy = p.stage_bottom_left[1];
     for (int i = 1; i <= n; i++) { // n rows
         int j = (n + i - 1) / i ; // n cols
         if (10 * i + 10 > p.stage_height || 10 * j + 10 > p.stage_width) continue;
@@ -409,7 +412,7 @@ Solution get_some_placement(const Problem &p) {
         for (int x = 0; x < j; x++)
             for (int y = 0; y < i; y++) {
                 if ((int)res.placements.size() == n) break;
-                res.placements.push_back({ dx * (x + 1), dy * (y + 1) });
+                res.placements.push_back({ sx + dx * (x + 1), sy + dy * (y + 1) });
             }
         return res;
     }
@@ -437,16 +440,26 @@ void solve(int problem_id) {
         exit(1);
     }
 
+	printf("id %d, %d musicians, %d attendees, %.0lf x %.0lf\n", problem_id, p.musicians.size(), p.attendees.size(), p.room_width, p.room_height );
+
     auto s0 = get_some_placement(p);
     if (s0.placements.empty()) {
         exit(2);
     }
+	if (!is_valid(p,s0))
+	{
+		fprintf(stderr, "Invalid placement!\n");
+		exit(3);
+	}
     auto [s, score] = solve_assignment(p, s0);
-    writeSolution(s, "test", problem_id);
-    printf("%d musicians, %d attendees, %.0f x %.0f, score: %.3f", p.musicians.size(), p.attendees.size(), p.room_width, p.room_height, score);
+    writeSolution(s, "liszt2", problem_id);
+    printf("score: %.3lf\n",  score);
+	double my_score = get_score(p,s);
+	printf("my score %.3lf\n", my_score);
 }
 
 int main() {
-    solve(1);
+	for (int i=1; i<=45; i++)
+		solve(i);
     return 0;
 }
