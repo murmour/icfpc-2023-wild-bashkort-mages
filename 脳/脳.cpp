@@ -47,10 +47,265 @@ struct Solution {
     FLD_BEGIN FLD(placements) FLD_END
 };
 
+struct T
+{
+	double x, y;
+	T( double _x=0., double _y=0.) { x=_x; y=_y; }
+};
+
+bool is_valid( const Problem & problem, const Solution & sol )
+{
+	int n = (int)problem.musicians.size();
+	double sx = problem.stage_bottom_left[0];
+	double sy = problem.stage_bottom_left[1];
+	for (int i=0; i<n; i++)
+	{
+		double x = sol.placements[i].x;
+		double y = sol.placements[i].y;
+		if (!(sx <= x && x <= sx+problem.stage_width && sy <= y && y <= sy+problem.stage_height)) return false;
+		for (int j=i+1; j<n; j++)
+		{
+			double dx = x - sol.placements[j].x;
+			double dy = y - sol.placements[j].y;
+			if (dx*dx + dy*dy < 100.0)
+				return false;
+		}
+	}
+	return true;
+}
+
+bool is_blocked( T A, T B, T C, double R )
+{
+	double dx1 = B.x - A.x, dy1 = B.y - A.y;
+	double dx2 = C.x - A.x, dy2 = C.y - A.y;
+	double cross1 = dx1*dx2 + dy1*dy2;
+	if (cross1 <= 0.) return false;
+	double dx3 = C.x - B.x, dy3 = C.y - B.y;
+	double cross2 = -dx1*dx3 - dy1*dy3;
+	if (cross2 <= 0.) return false;
+	double S = abs( dx1*dy2 - dx2*dy1 );
+	double d2 = dx1*dx1 + dy1*dy1;
+	// R <= S / sqrt(d2)
+	// R*R <= S*S / d2
+	return R*R*d2 <= S*S;
+}
+
+vector< int > get_blocked_stupid( const Problem & problem, const Solution & sol, int mus_id )
+{
+	int n = (int)problem.musicians.size();
+	int m = (int)problem.attendees.size();
+	vector< int > res = vector< int >( m, 0 );
+	
+	T A = T( sol.placements[mus_id].x, sol.placements[mus_id].y );
+	for (int i=0; i<m; i++)
+	{
+		T B = T( problem.attendees[i].x, problem.attendees[i].y );
+		for (int j=0; j<n; j++)
+			if (j != mus_id)
+			{
+				T C = T( sol.placements[j].x, sol.placements[j].y );
+				if (is_blocked( A, B, C, 5. ))
+				{
+					res[i] = 1;
+					break;
+				}
+			}
+	}
+	return res;
+}
+
+double pi = acos(-1.);
+
+vector< int > get_blocked( const Problem & problem, const Solution & sol, int mus_id )
+{
+	vector< pair< double, int > > vec; // < angle, id >
+	int n = (int)problem.musicians.size();
+	T A = T( sol.placements[mus_id].x, sol.placements[mus_id].y );
+	for (int i=0; i<n; i++)
+		if (i!=mus_id)
+		{
+			T B = T( sol.placements[i].x, sol.placements[i].y );
+			vec.push_back( make_pair( atan2( B.y-A.y, B.x-A.x ), i ) );
+		}
+	sort( vec.begin(), vec.end() );
+	int m = (int)problem.attendees.size();
+	vector< int > res = vector< int >( m, 0 );
+	for (int i=0; i<m; i++)
+	{
+		T C = T( problem.attendees[i].x, problem.attendees[i].y );
+		double angle = atan2( C.y-A.y, C.x-A.x );
+		int tmp = lower_bound( vec.begin(), vec.end(), make_pair( angle, -1 ) ) - vec.begin();
+		if (tmp==n) tmp = 0;
+		T B = T( sol.placements[vec[tmp].second].x, sol.placements[vec[tmp].second].y );
+		if (is_blocked( A, B, C, 5. ))
+		{
+			res[i] = 1;
+			break;
+		}
+		int tmp2 = tmp+1;
+		while(true)
+		{
+			if (tmp2==n) tmp2 = 0;
+			if (tmp2==tmp) break;
+			double delta = abs( vec[tmp2].first - angle );
+			if (delta > pi) delta = abs( 2*pi - delta );
+			if (delta*6 > pi) break;
+			T B = T( sol.placements[vec[tmp].second].x, sol.placements[vec[tmp].second].y );
+			if (is_blocked( A, B, C, 5. ))
+			{
+				res[i] = 1;
+				break;
+			}
+		}
+		tmp2 = tmp-1;
+		while(true)
+		{
+			if (tmp2==-1) tmp2 = n-1;
+			if (tmp2==tmp) break;
+			double delta = abs( vec[tmp2].first - angle );
+			if (delta > pi) delta = abs( 2*pi - delta );
+			if (delta*6 > pi) break;
+			T B = T( sol.placements[vec[tmp].second].x, sol.placements[vec[tmp].second].y );
+			if (is_blocked( A, B, C, 5. ))
+			{
+				res[i] = 1;
+				break;
+			}
+		}
+	}
+	return res;
+}
+
+vector< int > get_blocked2( const Problem & problem, const Solution & sol, int mus_id )
+{
+	int n = (int)problem.musicians.size();
+	T A = T( sol.placements[mus_id].x, sol.placements[mus_id].y );
+	vector< pair< double, int > > vecd; // < d2, id >
+	
+	for (int i=0; i<n; i++)
+		if (i!=mus_id)
+		{
+			T B = T( sol.placements[i].x, sol.placements[i].y );
+			double dx = A.x - B.x, dy = A.y - B.y;
+			vecd.push_back( make_pair( dx*dx + dy*dy, i ) );
+		}
+	sort( vecd.begin(), vecd.end() );
+
+	vector< vector< pair< double, int > > > vec; // < angle, id >
+	double R = 9.;
+	
+	vector< pair< double, int > > vec_cur;
+	vector< double > max_angle;
+	for (int i=0; i<n; i++)
+	{
+		if (i==n-1 || vecd[i].first > 2*R)
+		{
+			if (vec_cur.size()>0)
+			{
+				sort( vec_cur.begin(), vec_cur.end() );
+				vec.push_back( vec_cur );
+				vec_cur.clear();
+				max_angle.push_back( asin( 5./R ) + 0.0001 );
+			}
+			R *= 2;
+		}
+		if (i<n)
+		{
+			T B = T( sol.placements[i].x, sol.placements[i].y );
+			vec_cur.push_back( make_pair( atan2( B.y-A.y, B.x-A.x ), vecd[i].second ) );
+		}
+	}
+
+	int m = (int)problem.attendees.size();
+	vector< int > res = vector< int >( m, 0 );
+	for (int i=0; i<m; i++)
+	{
+		T C = T( problem.attendees[i].x, problem.attendees[i].y );
+		double angle = atan2( C.y-A.y, C.x-A.x );
+		for (int j=0; j<(int)vec.size(); j++)
+		{
+			int nn = vec[j].size();
+			int tmp = lower_bound( vec[j].begin(), vec[j].end(), make_pair( angle, -1 ) ) - vec[j].begin();
+			if (tmp==nn) tmp = 0;
+			T B = T( sol.placements[vec[j][tmp].second].x, sol.placements[vec[j][tmp].second].y );
+			if (is_blocked( A, B, C, 5. ))
+			{
+				res[i] = 1;
+				break;
+			}
+			int tmp2 = tmp+1;
+			while(true)
+			{
+				if (tmp2==nn) tmp2 = 0;
+				if (tmp2==tmp) break;
+				double delta = abs( vec[j][tmp2].first - angle );
+				if (delta > pi) delta = abs( 2*pi - delta );
+				if (delta > max_angle[j]) break;
+				T B = T( sol.placements[vec[j][tmp].second].x, sol.placements[vec[j][tmp].second].y );
+				if (is_blocked( A, B, C, 5. ))
+				{
+					res[i] = 1;
+					break;
+				}
+			}
+			tmp2 = tmp-1;
+			while(true)
+			{
+				if (tmp2==-1) tmp2 = nn-1;
+				if (tmp2==tmp) break;
+				double delta = abs( vec[j][tmp2].first - angle );
+				if (delta > pi) delta = abs( 2*pi - delta );
+				if (delta > max_angle[j]) break;
+				T B = T( sol.placements[vec[j][tmp].second].x, sol.placements[vec[j][tmp].second].y );
+				if (is_blocked( A, B, C, 5. ))
+				{
+					res[i] = 1;
+					break;
+				}
+			}
+		}
+	}
+	return res;
+}
+
+long long get_score( const Problem & problem, const Solution & sol )
+{
+	int n = (int)problem.musicians.size();
+	int m = (int)problem.attendees.size();
+	long long score = 0;
+
+	for (int i=0; i<n; i++)
+	{
+		T A = T( sol.placements[i].x, sol.placements[i].y );
+		vector< int > blocked = get_blocked2( problem, sol, i );
+		for (int j=0; j<m; j++)
+			if (blocked[j]==0)
+			{
+				T B = T( problem.attendees[j].x, problem.attendees[j].y );
+				double dx = A.x - B.x, dy = A.y - B.y;
+				double d2 = dx*dx + dy*dy;
+				double tmp = 1'000'000 * problem.attendees[j].tastes[problem.musicians[i]];
+				score += (long long)( ceil( tmp / d2 ) + 0.1 );
+			}
+	}
+	return score;
+}
+
 // [musician][attendee]
 vector<vector<int>> calc_visible(const Problem &p, const Solution &places) {
-    // todo!!
-    return {};
+	cerr << "calc visible...";
+	vector<vector<int>> res;
+	int n = (int)p.musicians.size();
+	int m = (int)p.attendees.size();
+    for (int i=0; i<n; i++)
+	{
+		vector< int > tmp = get_blocked_stupid( p, places, i );
+		for (int j=0; j<m; j++)
+			tmp[j] = 1 - tmp[j];
+		res.push_back( tmp );
+	}
+	cerr << "ok\n";
+	return res;
 }
 
 typedef double Weight;
@@ -117,6 +372,7 @@ vector<int> get_optimal_assignment(const vector<vector<Weight> > &a)
 }
 
 pair<Solution, double> solve_assignment(const Problem &p, const Solution &places) {
+	cerr << "solve assignment\n";
     auto visible = calc_visible(p, places);
     int n = (int)p.musicians.size();
     int m = (int)p.attendees.size();
@@ -142,6 +398,7 @@ pair<Solution, double> solve_assignment(const Problem &p, const Solution &places
 }
 
 Solution get_some_placement(const Problem &p) {
+	cerr << "get some placement\n";
     int n = (int)p.musicians.size();
     for (int i = 1; i <= n; n++) { // n rows
         int j = (n + i - 1) / i ; // n cols
