@@ -58,10 +58,10 @@ def get_prob(id: int) -> dict:
 
 def print_prob_stats(id: int) -> dict:
     p = get_prob(id)
-    print(f'{id}.plem:')
-    print(f'musician_count: {len(p["musicians"])}')
-    print(f'instument_count: {len(set(p["musicians"]))}')
-    print(f'attendee_count: {len(p["attendees"])}')
+    print(f'{id}.problem:')
+    print(f'musicians: {len(p["musicians"])}')
+    print(f'instuments: {len(set(p["musicians"]))}')
+    print(f'attendees: {len(p["attendees"])}')
     print(f'room_size: {p["room_width"]}x{p["room_height"]}')
     print(f'stage_size: {p["stage_width"]}x{p["stage_height"]}')
     print()

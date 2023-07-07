@@ -56,6 +56,10 @@ sol_cb['state'] = 'readonly'
 sol_cb.pack()
 
 
+top_label = tk.Label(root)
+top_label.pack()
+
+
 canvas_w = 1000
 canvas_h = 1000
 canvas = tk.Canvas(root, width=canvas_w, height=canvas_h)
@@ -150,9 +154,22 @@ def draw_prob(prob) -> None:
         )
 
 
+def update_top_label(prob) -> None:
+    p = prob
+    text = (
+        f'musicians: {len(p["musicians"])}, '
+        f'instuments: {len(set(p["musicians"]))}, '
+        f'attendees: {len(p["attendees"])}, '
+        f'room_size: {p["room_width"]}x{p["room_height"]}, '
+        f'stage_size: {p["stage_width"]}x{p["stage_height"]}'
+    )
+    top_label.config(text=text)
+
+
 def switch_prob(prob_id: int) -> None:
     prob = 手.get_prob(prob_id)
     draw_prob(prob)
+    update_top_label(prob)
     coord_label.focus_set()
 
 
