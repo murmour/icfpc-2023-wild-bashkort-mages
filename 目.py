@@ -84,19 +84,26 @@ def tk_color_from_rgba(rgba) -> str:
     return f'#{r:02x}{g:02x}{b:02x}'
 
 
-def project_coord(x: float, y: float) -> tuple[float, float]:
+def project(x: float, y: float) -> tuple[float, float]:
     ch = canvas.winfo_height()
     return (x*pixel_size, ch - (y*pixel_size))
 
 
 def on_mouse_move(event) -> None:
-    (x, y) = project_coord(event.x, event.y)
+    (x, y) = project(event.x, event.y)
     coord_label.config(text=f'x: {x}, y: {y}')
 
 canvas.bind("<Motion>", on_mouse_move)
 
 
-def draw_prob(prob) -> None:
+def draw_dot(x, y, fill, tag) -> None:
+    canvas.create_rectangle(
+        x-1, y-1, x+1, y+1,
+        fill=fill, width=0, tags=tag
+    )
+
+
+def draw_prob() -> None:
     canvas.delete('prob')
     if prob is None:
         return
@@ -104,8 +111,8 @@ def draw_prob(prob) -> None:
     # room
     rw = prob['room_width']
     rh = prob['room_height']
-    (x0, y0) = project_coord(0, 0)
-    (x1, y1) = project_coord(rw, rh)
+    (x0, y0) = project(0, 0)
+    (x1, y1) = project(rw, rh)
     canvas.create_rectangle(
         x0, y0, x1, y1,
         fill='white', width=0, tags='prob'
@@ -113,10 +120,10 @@ def draw_prob(prob) -> None:
 
     # stage
     (sx, sy) = prob['stage_bottom_left']
-    (x0, y0) = project_coord(sx, sy)
+    (x0, y0) = project(sx, sy)
     sw = prob['stage_width']
     sh = prob['stage_height']
-    (x1, y1) = project_coord(sx+sw, sy+sh)
+    (x1, y1) = project(sx+sw, sy+sh)
     canvas.create_rectangle(
         x0, y0, x1, y1,
         fill='white', outline='red', width=1, tags='prob'
@@ -126,26 +133,19 @@ def draw_prob(prob) -> None:
     for a in prob['attendees']:
         x = a['x']
         y = a['y']
-        (x0, y0) = project_coord(x, y)
-        canvas.create_rectangle(
-            x0, y0, x0+2, y0+2,
-            fill='black', width=0, tags='prob'
-        )
+        (x0, y0) = project(x, y)
+        draw_dot(x0, y0, 'black', 'prob')
 
 
-def draw_sol(sol) -> None:
+def draw_sol() -> None:
     canvas.delete('sol')
     if sol is None:
         return
-    for m in sol['placements']:
-        x = m['x']
-        y = m['y']
-        (x0, y0) = project_coord(x, y)
-        (x1, y1) = project_coord(x+1, y+1)
-        canvas.create_rectangle(
-            x0, y0, x1, y1,
-            fill='black', width=0, tags='sol'
-        )
+    for p in sol['placements']:
+        x = p['x']
+        y = p['y']
+        (x0, y0) = project(x, y)
+        draw_dot(x0, y0, 'black', 'sol')
 
 
 def fit_pixel_size(w: float, h: float) -> None:
@@ -155,7 +155,7 @@ def fit_pixel_size(w: float, h: float) -> None:
     pixel_size = min(cw/w, ch/h)
 
 
-def fit_pixel_size_to_prob(prob) -> None:
+def fit_pixel_size_to_prob() -> None:
     if prob is None:
         return
     rw = prob['room_width']
@@ -165,15 +165,15 @@ def fit_pixel_size_to_prob(prob) -> None:
 
 def on_resize(event):
     old_pixel_size = pixel_size
-    fit_pixel_size_to_prob(prob)
+    fit_pixel_size_to_prob()
     if pixel_size != old_pixel_size:
-        draw_prob(prob)
-        draw_sol(sol)
+        draw_prob()
+        draw_sol()
 
 canvas.bind('<Configure>', on_resize)
 
 
-def update_top_label(prob) -> None:
+def update_top_label() -> None:
     p = prob
     text = (
         f'musicians: {len(p["musicians"])}, '
