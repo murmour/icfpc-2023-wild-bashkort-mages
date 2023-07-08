@@ -101,22 +101,25 @@ def get_sol(prob_id: int, tag: str) -> dict:
 def get_score(prob_id: int, sol_tag: str) -> float:
     sol = get_sol(prob_id, sol_tag)
     return sol['score']
-    # prob_path = get_prob_path(prob_id)
-    # sol_dir = get_sol_dir_path(prob_id)
-    # sol_path = f'{sol_dir}/{sol_tag}.solution'
-    # sys.stdout.flush()
-    # try:
-    #     sol = subprocess.check_output([
-    #         '脳/脳',
-    #         '-pp', prob_path,
-    #         '-score', sol_path,
-    #     ])
-    #     return float(sol.decode())
-    # except subprocess.CalledProcessError as ex: # error code <> 0
-    #     print('-------- ERROR --------')
-    #     print(ex)
-    #     sys.stdout.flush()
-    #     return 0
+
+
+def get_score_dynamic(prob_id: int, sol_tag: str) -> float:
+    prob_path = get_prob_path(prob_id)
+    sol_dir = get_sol_dir_path(prob_id)
+    sol_path = f'{sol_dir}/{sol_tag}.solution'
+    sys.stdout.flush()
+    try:
+        sol = subprocess.check_output([
+            '脳/脳',
+            '-pp', prob_path,
+            '-score', sol_path,
+        ])
+        return float(sol.decode())
+    except subprocess.CalledProcessError as ex: # error code <> 0
+        print('-------- ERROR --------')
+        print(ex)
+        sys.stdout.flush()
+        return 0
 
 
 # unused
@@ -395,7 +398,7 @@ def patch_scores() -> None:
         for sol_tag in get_sol_tags(prob_id):
             sol = get_sol(prob_id, sol_tag)
             if 'score' not in sol:
-                score = get_score(prob_id, sol_tag)
+                score = get_score_dynamic(prob_id, sol_tag)
                 if score == 0:
                     print(f'bad sol: {prob_id}.{sol_tag}')
                     continue
@@ -464,8 +467,7 @@ if __name__ == '__main__':
         exit(0)
 
     if cmd == 'patch_scores':
-        for pid in all_prob_ids():
-            patch_scores()
+        patch_scores()
         exit(0)
 
     if cmd == 'get_scoreboard':
