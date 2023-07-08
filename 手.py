@@ -66,6 +66,7 @@ def get_prob(prob_id: int) -> dict:
 def send_sol_request(prob_id: int, sol_tag: str) -> str:
     print(f'Sending {prob_id}.{sol_tag}...')
     sol = get_sol(prob_id, sol_tag)
+    del(sol['score'])
     sub = { 'problem_id': prob_id, 'contents': json.dumps(sol) }
     sub_path = 'submission.js'
     with io.open(sub_path, 'w') as f:
