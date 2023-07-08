@@ -765,82 +765,6 @@ vector<double> get_instrument_scores(const Problem &p) {
 	return res;
 }
 
-Solution get_border_sorted(const Problem & p, int mask = 15)
-{
-	int n = (int)p.musicians.size();
-	auto i_scores = get_instrument_scores(p);
-	vector<pair<double, int>> m_scores;
-	for (int i = 0; i < n; i++)
-		m_scores.push_back({ i_scores[p.musicians[i]], i });
-	sort(m_scores.begin(), m_scores.end());
-	reverse(m_scores.begin(), m_scores.end());
-
-	double sx = p.stage_bottom_left[0];
-	double sy = p.stage_bottom_left[1];
-	Solution res;
-	for (int i=0; i<n; i++)
-	{
-		int iters = 0;
-		while(true)
-		{
-			iters++;
-			if (iters > 1000 || m_scores[i].first < 0)
-			{
-				double x = sx + (p.stage_width-20.) * rand()/(RAND_MAX-1) + 10.;
-				double y = sy + (p.stage_height-20.) * rand()/(RAND_MAX-1) + 10.;
-				bool flag = true;
-				for (int j=0; j<i; j++)
-				{
-					double dx = res.placements[j].x - x;
-					double dy = res.placements[j].y - y;
-					if (dx*dx + dy*dy < 100.)
-					{
-						flag = false;
-						break;
-					}
-				}
-				if (flag)
-				{
-					res.placements.push_back( { x, y } );
-					break;
-				}
-				else continue;
-			}
-			int side = rand()%4;
-			if ( ((mask >> side)&1)==0 ) continue;
-			double x, y;
-			if (side==0 || side==1)
-				x = sx + (p.stage_width-20.) * rand()/(RAND_MAX-1) + 10.;
-			else if (side==2)
-				x = sx + 10.;
-			else x = sx + p.stage_width - 10.;
-			if (side==2 || side==3)
-				y = sy + (p.stage_height-20.) * rand()/(RAND_MAX-1) + 10.;
-			else if (side==0)
-				y = sy + 10.;
-			else y = sy + p.stage_height - 10.;
-			bool flag = true;
-			for (int j=0; j<i; j++)
-			{
-				double dx = res.placements[j].x - x;
-				double dy = res.placements[j].y - y;
-				if (dx*dx + dy*dy < 100.)
-				{
-					flag = false;
-					break;
-				}
-			}
-			if (flag)
-			{
-				res.placements.push_back( { x, y } );
-				break;
-			}
-		}
-	}
-	//cerr << "got border placement\n";
-	return res;
-}
-
 void solve(const string &infile, int timeout, const string &solver, const string &fname) {
     Json::Value root, root_s;
     Problem p;
@@ -868,8 +792,6 @@ void solve(const string &infile, int timeout, const string &solver, const string
 		    s0 = get_two_row_border_placement(p, rand()%16);
         else if (solver == "border")
             s0 = get_border_placement(p, rand() % 16);
-		else if (solver == "border_sorted")
-            s0 = get_border_sorted(p, rand() % 16);
         else if (solver == "regular")
             s0 = get_regular_border_placement(p, rand() % 16);
 		else if (solver == "compact") {
