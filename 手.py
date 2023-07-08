@@ -16,7 +16,7 @@ api_key = (
     '2OTc5NH0.svNmE8_E5X7tEQjnqNF9rtdlgOckN21pZJ85br6uFOw'
 )
 
-prob_count = 55
+prob_count = 90
 
 
 def all_prob_ids() -> list[int]:
