@@ -240,6 +240,25 @@ def parsolve(solver_id, solver_args, sol_id, start_id, end_id, job_count) -> Non
                 pool[i] = None
                 finish_solving(job, retcode)
 
+def get_best_score(prob_id: int) -> float:
+    sol_tags = get_sol_tags(prob_id)
+    best = None
+    best_score = None
+    for tag in sol_tags:
+        score = get_score(prob_id, tag)
+        if best is None or score > best_score:
+            best = tag
+            best_score = score
+    return best_score
+
+def get_sorted_scores():
+    data = []
+    for pid in all_prob_ids():
+        data.append((get_best_score(pid), pid))
+    data.sort(reverse=True)
+    for score, pid in data:
+        print('%12.0f %3d' % (score, pid))
+
 
 if __name__ == '__main__':
     cmd = sys.argv[1]
@@ -260,6 +279,10 @@ if __name__ == '__main__':
             print_sol_stats(pid)
             print()
         print(f'TOTAL = {total_score}')
+        exit(0)
+
+    if cmd == 'get_sorted_scores':
+        get_sorted_scores()
         exit(0)
 
     if cmd == 'update_username':
