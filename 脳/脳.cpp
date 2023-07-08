@@ -133,45 +133,50 @@ vector< int > get_blocked( const Problem & problem, const Solution & sol, int mu
 	vector< int > res = vector< int >( m, 0 );
 	for (int i=0; i<m; i++)
 	{
-		T C = T( problem.attendees[i].x, problem.attendees[i].y );
-		double angle = atan2( C.y-A.y, C.x-A.x );
+		T B = T( problem.attendees[i].x, problem.attendees[i].y );
+		double angle = atan2( B.y-A.y, B.x-A.x );
 		int tmp = lower_bound( vec.begin(), vec.end(), make_pair( angle, -1 ) ) - vec.begin();
-		if (tmp==n) tmp = 0;
-		T B = T( sol.placements[vec[tmp].second].x, sol.placements[vec[tmp].second].y );
+		if (tmp==(int)vec.size()) tmp = 0;
+		T C = T( sol.placements[vec[tmp].second].x, sol.placements[vec[tmp].second].y );
 		if (is_blocked( A, B, C, 5. ))
 		{
 			res[i] = 1;
-			break;
+			continue;
 		}
 		int tmp2 = tmp+1;
+		bool flag = false;
 		while(true)
 		{
-			if (tmp2==n) tmp2 = 0;
+			if (tmp2==(int)vec.size()) tmp2 = 0;
 			if (tmp2==tmp) break;
 			double delta = abs( vec[tmp2].first - angle );
 			if (delta > pi) delta = abs( 2*pi - delta );
 			if (delta*6 > pi) break;
-			T B = T( sol.placements[vec[tmp].second].x, sol.placements[vec[tmp].second].y );
+			T C = T( sol.placements[vec[tmp2].second].x, sol.placements[vec[tmp2].second].y );
 			if (is_blocked( A, B, C, 5. ))
 			{
 				res[i] = 1;
+				flag = true;
 				break;
 			}
+			tmp2++;
 		}
+		if (flag) continue;
 		tmp2 = tmp-1;
 		while(true)
 		{
-			if (tmp2==-1) tmp2 = n-1;
+			if (tmp2==-1) tmp2 = (int)vec.size()-1;
 			if (tmp2==tmp) break;
 			double delta = abs( vec[tmp2].first - angle );
 			if (delta > pi) delta = abs( 2*pi - delta );
 			if (delta*6 > pi) break;
-			T B = T( sol.placements[vec[tmp].second].x, sol.placements[vec[tmp].second].y );
+			T C = T( sol.placements[vec[tmp2].second].x, sol.placements[vec[tmp2].second].y );
 			if (is_blocked( A, B, C, 5. ))
 			{
 				res[i] = 1;
 				break;
 			}
+			tmp2--;
 		}
 	}
 	return res;
@@ -199,7 +204,7 @@ vector< int > get_blocked2( const Problem & problem, const Solution & sol, int m
 	vector< double > max_angle;
 	for (int i=0; i<n; i++)
 	{
-		if (i==n-1 || vecd[i].first > 2*R)
+		if (i==n-1 || vecd[i].first > 4*R*R)
 		{
 			if (vec_cur.size()>0)
 			{
@@ -210,9 +215,9 @@ vector< int > get_blocked2( const Problem & problem, const Solution & sol, int m
 			}
 			R *= 2;
 		}
-		if (i<n)
+		if (i<n-1)
 		{
-			T B = T( sol.placements[i].x, sol.placements[i].y );
+			T B = T( sol.placements[vecd[i].second].x, sol.placements[vecd[i].second].y );
 			vec_cur.push_back( make_pair( atan2( B.y-A.y, B.x-A.x ), vecd[i].second ) );
 		}
 	}
@@ -221,20 +226,21 @@ vector< int > get_blocked2( const Problem & problem, const Solution & sol, int m
 	vector< int > res = vector< int >( m, 0 );
 	for (int i=0; i<m; i++)
 	{
-		T C = T( problem.attendees[i].x, problem.attendees[i].y );
-		double angle = atan2( C.y-A.y, C.x-A.x );
+		T B = T( problem.attendees[i].x, problem.attendees[i].y );
+		double angle = atan2( B.y-A.y, B.x-A.x );
 		for (int j=0; j<(int)vec.size(); j++)
 		{
 			int nn = vec[j].size();
 			int tmp = lower_bound( vec[j].begin(), vec[j].end(), make_pair( angle, -1 ) ) - vec[j].begin();
 			if (tmp==nn) tmp = 0;
-			T B = T( sol.placements[vec[j][tmp].second].x, sol.placements[vec[j][tmp].second].y );
+			T C = T( sol.placements[vec[j][tmp].second].x, sol.placements[vec[j][tmp].second].y );
 			if (is_blocked( A, B, C, 5. ))
 			{
 				res[i] = 1;
 				break;
 			}
 			int tmp2 = tmp+1;
+			bool flag = false;
 			while(true)
 			{
 				if (tmp2==nn) tmp2 = 0;
@@ -242,13 +248,16 @@ vector< int > get_blocked2( const Problem & problem, const Solution & sol, int m
 				double delta = abs( vec[j][tmp2].first - angle );
 				if (delta > pi) delta = abs( 2*pi - delta );
 				if (delta > max_angle[j]) break;
-				T B = T( sol.placements[vec[j][tmp].second].x, sol.placements[vec[j][tmp].second].y );
+				T C = T( sol.placements[vec[j][tmp2].second].x, sol.placements[vec[j][tmp2].second].y );
 				if (is_blocked( A, B, C, 5. ))
 				{
 					res[i] = 1;
+					flag = true;
 					break;
 				}
+				tmp2++;
 			}
+			if (flag) break;
 			tmp2 = tmp-1;
 			while(true)
 			{
@@ -257,13 +266,16 @@ vector< int > get_blocked2( const Problem & problem, const Solution & sol, int m
 				double delta = abs( vec[j][tmp2].first - angle );
 				if (delta > pi) delta = abs( 2*pi - delta );
 				if (delta > max_angle[j]) break;
-				T B = T( sol.placements[vec[j][tmp].second].x, sol.placements[vec[j][tmp].second].y );
+				T C = T( sol.placements[vec[j][tmp2].second].x, sol.placements[vec[j][tmp2].second].y );
 				if (is_blocked( A, B, C, 5. ))
 				{
 					res[i] = 1;
+					flag = true;
 					break;
 				}
+				tmp2--;
 			}
+			if (flag) break;
 		}
 	}
 	return res;
@@ -278,7 +290,7 @@ double get_score( const Problem & problem, const Solution & sol )
 	for (int i=0; i<n; i++)
 	{
 		T A = T( sol.placements[i].x, sol.placements[i].y );
-		vector< int > blocked = get_blocked_stupid( problem, sol, i );
+		vector< int > blocked = get_blocked2( problem, sol, i );
 		for (int j=0; j<m; j++)
 			if (blocked[j]==0)
 			{
@@ -300,7 +312,9 @@ vector<vector<int>> calc_visible(const Problem &p, const Solution &places) {
 	int m = (int)p.attendees.size();
     for (int i=0; i<n; i++)
 	{
-		vector< int > tmp = get_blocked_stupid( p, places, i );
+		vector< int > tmp = get_blocked2( p, places, i );
+		//vector< int > tmp2 = get_blocked_stupid( p, places, i );
+		//if (tmp != tmp2) exit(666);
 		for (int j=0; j<m; j++)
 			tmp[j] = 1 - tmp[j];
 		res.push_back( tmp );
@@ -646,7 +660,7 @@ void solve(int problem_id) {
 		if (score > best_score)
 		{
 			best_score = score;
-			writeSolution(s, "liszt_border4", problem_id);
+			writeSolution(s, "liszt_test", problem_id);
 			printf("iters: %d score: %.3lf\n", iters, score);
 			//double my_score = get_score(p,s);
 			//printf("my score %.3lf\n", my_score);
@@ -655,8 +669,8 @@ void solve(int problem_id) {
 }
 
 int main() {
-	//solve(36);
-	for (int i=9; i<=45; i++)
-		solve(i);
+	solve(1);
+	//for (int i=9; i<=45; i++)
+	//	solve(i);
     return 0;
 }
