@@ -140,16 +140,13 @@ def get_score_from_str(prob_id: int, sol_str: str) -> float:
 
 
 def get_best_sol(prob_id) -> str | None:
-    best_score = None
+    best_score = 0
     best_tag = None
     for tag in get_sol_tags(prob_id):
         score = get_score(prob_id, tag)
-        if best_score == None or score > best_score:
+        if score > best_score:
             best_score = score
             best_tag = tag
-    if best_score == None:
-        print(f'{prob_id}: -')
-        return None
     print(f'{prob_id}: {best_tag} ({best_score})')
     return best_tag
 
@@ -194,7 +191,7 @@ def print_sol_stats(prob_id: int) -> dict:
     sol_tags = get_sol_tags(prob_id)
 
     best = None
-    best_score = None
+    best_score = 0
     for tag in sol_tags:
         score = get_score(prob_id, tag)
         print(f'  {tag} = {score}')
@@ -314,15 +311,7 @@ def parsolve(
 
 
 def get_best_score(prob_id: int) -> float:
-    sol_tags = get_sol_tags(prob_id)
-    best = None
-    best_score = None
-    for tag in sol_tags:
-        score = get_score(prob_id, tag)
-        if best is None or score > best_score:
-            best = tag
-            best_score = score
-    return best_score
+    return get_best_sol(prob_id)['score']
 
 
 def get_sorted_scores():

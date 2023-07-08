@@ -47,7 +47,7 @@ prob_cb.pack()
 
 
 sol = None
-sol_ids = []
+sol_tags = []
 
 sol_var = tk.StringVar()
 sol_cb = ttk.Combobox(root, textvariable=sol_var)
@@ -208,6 +208,9 @@ def switch_sol(sol_tag: str) -> None:
     if sol_tag == '':
         canvas.delete('sol')
         return
+    if ':' in sol_tag:
+        sol_tag = sol_tag.partition(':')[0]
+
     prob_id = int(prob_cb.get())
     sol = 手.get_sol(prob_id, sol_tag)
     draw_sol(sol)
@@ -216,16 +219,22 @@ def switch_sol(sol_tag: str) -> None:
 
 
 def switch_prob(prob_id: int) -> None:
-    global sol_ids, prob
+    global sol_tags, prob
 
     prob = 手.get_prob(prob_id)
-    fit_pixel_size_to_prob(prob)
-    draw_prob(prob)
-    update_top_label(prob)
+    best_score = 手.get_best_score(prob_id)
+    fit_pixel_size_to_prob()
+    draw_prob()
+    update_top_label()
 
-    sol_ids = 手.get_sol_tags(prob_id)
-    sol_cb['values'] = sol_ids
-    if len(sol_ids) == 0:
+    def f(tag):
+        return (tag, 手.get_score(prob_id, tag))
+    sol_tags = [ f(tag) for tag in 手.get_sol_tags(prob_id) ]
+    sol_tags.sort(key = lambda x: x[1], reverse = True)
+    sol_tags = [ f'{x[0]}: {(x[1]/best_score):0,.2f}' for x in sol_tags ]
+
+    sol_cb['values'] = sol_tags
+    if len(sol_tags) == 0:
         sol_cb.set('')
     else:
         sol_cb.current(0)
@@ -272,24 +281,24 @@ def prev_prob() -> None:
 
 @key('Next')
 def next_sol() -> None:
-    if sol_ids == []:
+    if sol_tags == []:
         return
     name = sol_cb.get()
-    pi = sol_ids.index(name)
-    next_pi = (pi+1) % len(sol_ids)
-    next_id = sol_ids[next_pi]
+    pi = sol_tags.index(name)
+    next_pi = (pi+1) % len(sol_tags)
+    next_id = sol_tags[next_pi]
     sol_cb.set(next_id)
     switch_sol(next_id)
 
 
 @key('Prior')
 def prev_sol() -> None:
-    if sol_ids == []:
+    if sol_tags == []:
         return
     name = sol_cb.get()
-    pi = sol_ids.index(name)
-    next_pi = (pi-1) % len(sol_ids)
-    next_id = sol_ids[next_pi]
+    pi = sol_tags.index(name)
+    next_pi = (pi-1) % len(sol_tags)
+    next_id = sol_tags[next_pi]
     sol_cb.set(next_id)
     switch_sol(next_id)
 
