@@ -132,13 +132,24 @@ def get_best_sol(prob_id) -> str | None:
     return best_tag
 
 
-def get_local_best() -> dict:
-    r = {}
+def send_all_best() -> dict:
     for prob_id in all_prob_ids():
-        sol = get_best_sol(prob_id)
-        if sol is not None:
-            r[prob_id] = sol
-    return r
+        sol_tag = get_best_sol(prob_id)
+        if sol_tag is None:
+            print(f'{prob_id}: -')
+        send_sol_request(prob_id, sol_tag)
+
+
+def send_all_best_lazy(userboard) -> dict:
+    for i, prob_id in enumerate(all_prob_ids()):
+        sol_tag = get_best_sol(prob_id)
+        if sol_tag is None:
+            print(f'{prob_id}: -')
+        score = get_score(prob_id, sol_tag)
+        remote_score = userboard["problems"][i]
+        if remote_score is None or score > remote_score:
+            print(f'{prob_id}: {score} > {remote_score}')
+            send_sol_request(prob_id, sol_tag)
 
 
 def print_prob_stats(prob_id: int) -> dict:
@@ -322,9 +333,9 @@ def print_scoreboard(sb: dict) -> None:
         print(f'{i}. {line["username"]} = {line["score"]}')
 
 
-def print_userboard(sb: dict) -> None:
+def print_userboard(ub: dict) -> None:
     print(f'userboard:')
-    for i, score in enumerate(sb['problems']):
+    for i, score in enumerate(ub['problems']):
         print(f'{i} = {"-" if score is None else score}')
 
 
@@ -369,9 +380,12 @@ if __name__ == '__main__':
         exit(0)
 
     if cmd == 'send_all_best':
-        best = get_local_best()
-        for prob_id, sol_tag in best.items():
-            send_sol_request(prob_id, sol_tag)
+        send_all_best()
+        exit(0)
+
+    if cmd == 'send_all_best_lazy':
+        ub = get_userboard_request()
+        send_all_best_lazy(ub)
         exit(0)
 
     if cmd == 'get_scoreboard':
