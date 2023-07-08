@@ -1007,7 +1007,7 @@ int main(int argc, char *argv[]) {
             in_file = format("../問/%s.problem", p);
     }
 
-	regex prob_id("/(\\d)+\\.problem");
+	regex prob_id("/(\\d+)\\.problem");
 	smatch match;
 	if (regex_search(in_file, match, prob_id)) {
 		string s = match[1].str();
