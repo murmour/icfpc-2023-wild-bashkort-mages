@@ -135,6 +135,17 @@ def draw_prob() -> None:
         fill='white', outline='red', width=1, tags='prob'
     )
 
+    # pillars
+    if 'pillars' in prob:
+        for p in prob['pillars']:
+            [ cx, cy ] = p['center']
+            (cx_px, cy_px) = project(cx, cy)
+            (r, _) = project(p['radius'], 0)
+            canvas.create_oval(
+                cx_px-r, cy_px-r, cx_px+r, cy_px+r,
+                outline='blue', tags='prob'
+            )
+
     # attendees
     for a in prob['attendees']:
         x = a['x']
