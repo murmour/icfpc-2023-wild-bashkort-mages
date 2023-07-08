@@ -147,7 +147,7 @@ def get_best_sol(prob_id) -> str | None:
     if best_score == None:
         print(f'{prob_id}: -')
         return None
-    print(f'{prob_id}: {best_tag} ({score})')
+    print(f'{prob_id}: {best_tag} ({best_score})')
     return best_tag
 
 
@@ -160,7 +160,7 @@ def send_all_best() -> dict:
 
 
 def send_all_best_lazy(userboard) -> dict:
-    for prob_id in enumerate(all_prob_ids()):
+    for prob_id in all_prob_ids():
         sol_tag = get_best_sol(prob_id)
         if sol_tag is None:
             print(f'{prob_id}: -')
