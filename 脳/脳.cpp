@@ -294,7 +294,7 @@ double get_score( const Problem & problem, const Solution & sol )
 
 // [musician][attendee]
 vector<vector<int>> calc_visible(const Problem &p, const Solution &places) {
-	cerr << "calc visible...";
+	//cerr << "calc visible...";
 	vector<vector<int>> res;
 	int n = (int)p.musicians.size();
 	int m = (int)p.attendees.size();
@@ -305,7 +305,7 @@ vector<vector<int>> calc_visible(const Problem &p, const Solution &places) {
 			tmp[j] = 1 - tmp[j];
 		res.push_back( tmp );
 	}
-	cerr << "ok\n";
+	//cerr << "ok\n";
 	return res;
 }
 
@@ -373,7 +373,7 @@ vector<int> get_optimal_assignment(const vector<vector<Weight> > &a)
 }
 
 pair<Solution, double> solve_assignment(const Problem &p, const Solution &places) {
-	cerr << "solve assignment\n";
+	//cerr << "solve assignment\n";
     auto visible = calc_visible(p, places);
     int n = (int)p.musicians.size();
     int m = (int)p.attendees.size();
@@ -396,6 +396,189 @@ pair<Solution, double> solve_assignment(const Problem &p, const Solution &places
         score += mat[i][ass[i]];
     }
     return {res, -score};
+}
+
+Solution get_regular_border_placement(const Problem & p, int mask = 15)
+{
+	int n = (int)p.musicians.size();
+	double sx = p.stage_bottom_left[0];
+	double sy = p.stage_bottom_left[1];
+	Solution res;
+
+	for (int side=0; side<4; side++)
+		if ((mask>>side)&1)
+		{
+			if (side==0 || side==1)
+			{
+				for (int i=0; i*10+20 <= p.stage_width; i++)
+				{
+					double x = sx + 10 + i*10;
+					double y = sy + (side==0 ? 10 : p.stage_height-10);
+					bool flag = true;
+					for (int j=0; j<res.placements.size(); j++)
+					{
+						double dx = res.placements[j].x - x;
+						double dy = res.placements[j].y - y;
+						if (dx*dx + dy*dy < 100.)
+						{
+							flag = false;
+							break;
+						}
+					}
+					if (flag)
+					{
+						res.placements.push_back( { x, y } );
+						if (res.placements.size() == n) return res;
+					}
+				}
+			}
+
+			if (side==2 || side==3)
+			{
+				for (int i=0; i*10+20 <= p.stage_height; i++)
+				{
+					double x = sx + (side==2 ? 10 : p.stage_width-10);
+					double y = sy + 10 + i*10;
+					bool flag = true;
+					for (int j=0; j<res.placements.size(); j++)
+					{
+						double dx = res.placements[j].x - x;
+						double dy = res.placements[j].y - y;
+						if (dx*dx + dy*dy < 100.)
+						{
+							flag = false;
+							break;
+						}
+					}
+					if (flag)
+					{
+						res.placements.push_back( { x, y } );
+						if (res.placements.size() == n) return res;
+					}
+				}
+			}
+		}
+	while (res.placements.size() < n)
+	{
+		double x = sx + (p.stage_width-20.) * rand()/(RAND_MAX-1) + 10.;
+		double y = sy + (p.stage_height-20.) * rand()/(RAND_MAX-1) + 10.;
+		bool flag = true;
+		for (int j=0; j<res.placements.size(); j++)
+		{
+			double dx = res.placements[j].x - x;
+			double dy = res.placements[j].y - y;
+			if (dx*dx + dy*dy < 100.)
+			{
+				flag = false;
+				break;
+			}
+		}
+		if (flag) res.placements.push_back( { x, y } );
+	}
+	return res;
+}
+
+Solution get_border_placement(const Problem & p, int mask = 15)
+{
+	int n = (int)p.musicians.size();
+	double sx = p.stage_bottom_left[0];
+	double sy = p.stage_bottom_left[1];
+	Solution res;
+	for (int i=0; i<n; i++)
+	{
+		int iters = 0;
+		while(true)
+		{
+			iters++;
+			if (iters > 1000)
+			{
+				double x = sx + (p.stage_width-20.) * rand()/(RAND_MAX-1) + 10.;
+				double y = sy + (p.stage_height-20.) * rand()/(RAND_MAX-1) + 10.;
+				bool flag = true;
+				for (int j=0; j<i; j++)
+				{
+					double dx = res.placements[j].x - x;
+					double dy = res.placements[j].y - y;
+					if (dx*dx + dy*dy < 100.)
+					{
+						flag = false;
+						break;
+					}
+				}
+				if (flag)
+				{
+					res.placements.push_back( { x, y } );
+					break;
+				}
+				else continue;
+			}
+			int side = rand()%4;
+			if ( ((mask >> side)&1)==0 ) continue;
+			double x, y;
+			if (side==0 || side==1)
+				x = sx + (p.stage_width-20.) * rand()/(RAND_MAX-1) + 10.;
+			else if (side==2)
+				x = sx + 10.;
+			else x = sx + p.stage_width - 10.;
+			if (side==2 || side==3)
+				y = sy + (p.stage_height-20.) * rand()/(RAND_MAX-1) + 10.;
+			else if (side==0)
+				y = sy + 10.;
+			else y = sy + p.stage_height - 10.;
+			bool flag = true;
+			for (int j=0; j<i; j++)
+			{
+				double dx = res.placements[j].x - x;
+				double dy = res.placements[j].y - y;
+				if (dx*dx + dy*dy < 100.)
+				{
+					flag = false;
+					break;
+				}
+			}
+			if (flag)
+			{
+				res.placements.push_back( { x, y } );
+				break;
+			}
+		}
+	}
+	//cerr << "got border placement\n";
+	return res;
+}
+
+Solution get_random_placement(const Problem & p)
+{
+	//cerr << "get random placement\n";
+	int n = (int)p.musicians.size();
+	double sx = p.stage_bottom_left[0];
+	double sy = p.stage_bottom_left[1];
+	Solution res;
+	for (int i=0; i<n; i++)
+	{
+		while(true)
+		{
+			double x = sx + (p.stage_width-20.) * rand()/(RAND_MAX-1) + 10.;
+			double y = sy + (p.stage_height-20.) * rand()/(RAND_MAX-1) + 10.;
+			bool flag = true;
+			for (int j=0; j<i; j++)
+			{
+				double dx = res.placements[j].x - x;
+				double dy = res.placements[j].y - y;
+				if (dx*dx + dy*dy < 100.)
+				{
+					flag = false;
+					break;
+				}
+			}
+			if (flag)
+			{
+				res.placements.push_back( { x, y } );
+				break;
+			}
+		}
+	}
+	return res;
 }
 
 Solution get_some_placement(const Problem &p) {
@@ -442,24 +625,38 @@ void solve(int problem_id) {
 
 	printf("id %d, %d musicians, %d attendees, %.0lf x %.0lf\n", problem_id, p.musicians.size(), p.attendees.size(), p.room_width, p.room_height );
 
-    auto s0 = get_some_placement(p);
-    if (s0.placements.empty()) {
-        exit(2);
-    }
-	if (!is_valid(p,s0))
+	double best_score = 0.;
+	int iters = 0;
+	int start_time = clock();
+	while(true)
 	{
-		fprintf(stderr, "Invalid placement!\n");
-		exit(3);
+		int cur_time = clock();
+		if (cur_time - start_time > 60*CLOCKS_PER_SEC) break;
+		auto s0 = get_regular_border_placement(p, rand()%16);
+		if (s0.placements.empty()) {
+			exit(2);
+		}
+		if (!is_valid(p,s0))
+		{
+			fprintf(stderr, "Invalid placement!\n");
+			exit(3);
+		}
+		auto [s, score] = solve_assignment(p, s0);
+		iters++;
+		if (score > best_score)
+		{
+			best_score = score;
+			writeSolution(s, "liszt_border4", problem_id);
+			printf("iters: %d score: %.3lf\n", iters, score);
+			//double my_score = get_score(p,s);
+			//printf("my score %.3lf\n", my_score);
+		}
 	}
-    auto [s, score] = solve_assignment(p, s0);
-    writeSolution(s, "liszt2", problem_id);
-    printf("score: %.3lf\n",  score);
-	double my_score = get_score(p,s);
-	printf("my score %.3lf\n", my_score);
 }
 
 int main() {
-	for (int i=1; i<=45; i++)
+	//solve(36);
+	for (int i=9; i<=45; i++)
 		solve(i);
     return 0;
 }
