@@ -196,6 +196,7 @@ def update_top_label() -> None:
         f'musicians: {len(p["musicians"])}, '
         f'instuments: {len(set(p["musicians"]))}, '
         f'attendees: {len(p["attendees"])}, '
+        f'pillars: {len(p["pillars"])}, '
         f'room_size: {p["room_width"]}x{p["room_height"]}, '
         f'stage_size: {p["stage_width"]}x{p["stage_height"]}'
     )
