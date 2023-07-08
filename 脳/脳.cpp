@@ -66,7 +66,7 @@ bool is_valid( const Problem & problem, const Solution & sol )
 	{
 		double x = sol.placements[i].x;
 		double y = sol.placements[i].y;
-		if (!(sx <= x + 10 && x + 10 <= sx+problem.stage_width && sy <= y + 10 && y + 10 <= sy+problem.stage_height)) 
+		if (!(sx <= x + 10 && x + 10 <= sx+problem.stage_width && sy <= y + 10 && y + 10 <= sy+problem.stage_height))
 		{
 			fprintf(stderr, "mus %d is out of stage: (%.3f, %.3f)\n", i, x, y);
 			return false;
@@ -719,7 +719,7 @@ Solution get_compact_placement(const Problem &p, int xmode = 0, int ymode = 0) {
 			res.placements.push_back({x, y});
 		}
 	return res;
-} 
+}
 
 void writeSolution(const Solution &sol, string fname) {
     //auto f = fopen(format("../答/%d/%s.solution", problem_id, tag).c_str(), "wt");
@@ -737,7 +737,7 @@ void writeSolution(const Solution &sol, string fname) {
 
 inline double score_f_no_ceil(double x1, double y1, double x2, double y2, double taste) {
 	double d2 = Sqr(x1 - x2) + Sqr(y1 - y2);
-	double tmp = 1'000'000 * taste;     
+	double tmp = 1'000'000 * taste;
 	return tmp / d2;
 }
 
@@ -837,7 +837,7 @@ Solution wiggle(const Problem &p, const Solution &sol) {
 
 inline double score_f(double x1, double y1, double x2, double y2, double taste) {
 	double d2 = Sqr(x1 - x2) + Sqr(y1 - y2);
-	double tmp = 1'000'000 * taste;     
+	double tmp = 1'000'000 * taste;
 	return ceil(tmp / d2);
 }
 
@@ -990,7 +990,7 @@ int main(int argc, char *argv[]) {
     if (auto p = args.get_arg("-score")) {
         Json::Value root;
         Solution sol;
-		
+
         if (!readJsonFile(p, root)) { return 1; }
         if (!deserializeJson(sol, root)) { return 2; }
         Problem prob;
