@@ -313,7 +313,7 @@ double get_score( const Problem & problem, const Solution & sol, bool use_ceil=t
 	if (new_scoring) {
 		for (int i = 0; i < n; i++) {
 			double t = 1;
-			for (int j = 0; j < n; j++) if (i != j) t += 1.0 / hypot(sol.placements[i].x - sol.placements[j].x, sol.placements[i].y - sol.placements[j].y);
+			for (int j = 0; j < n; j++) if (i != j && problem.musicians[i] == problem.musicians[j]) t += 1.0 / hypot(sol.placements[i].x - sol.placements[j].x, sol.placements[i].y - sol.placements[j].y);
 			q[i] = t;
 		}
 	} else {
@@ -433,7 +433,7 @@ Solution solve_assignment(const Problem &p, const Solution &places) {
 	if (new_scoring) {
 		for (int i = 0; i < n; i++) {
 			double t = 1;
-			for (int j = 0; j < n; j++) if (i != j) t += 1.0 / hypot(places.placements[i].x - places.placements[j].x, places.placements[i].y - places.placements[j].y);
+			for (int j = 0; j < n; j++) if (i != j && p.musicians[i] == p.musicians[j]) t += 1.0 / hypot(places.placements[i].x - places.placements[j].x, places.placements[i].y - places.placements[j].y);
 			q[i] = t;
 		}
 	} else {
