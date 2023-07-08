@@ -97,17 +97,36 @@ def get_sol(prob_id: int, tag: str) -> dict:
         return json.loads(h.read())
 
 
-def get_score(prob_id: int, sol_tag: str) -> float | None:
+def get_score(prob_id: int, sol_tag: str) -> float:
     prob_path = get_prob_path(prob_id)
     sol_dir = get_sol_dir_path(prob_id)
     sol_path = f'{sol_dir}/{sol_tag}.solution'
     sys.stdout.flush()
     try:
         sol = subprocess.check_output([
-            '../solver/solver',
+            '脳/脳',
             '-pp', prob_path,
             '-score', sol_path,
         ])
+        return float(sol.decode())
+    except subprocess.CalledProcessError as ex: # error code <> 0
+        print('-------- ERROR --------')
+        print(ex)
+        sys.stdout.flush()
+        return 0
+
+
+def get_score_from_str(prob_id: int, sol_str: str) -> float:
+    prob_path = get_prob_path(prob_id)
+    sys.stdout.flush()
+    try:
+        sol = subprocess.check_output([
+                '脳/脳',
+                '-pp', prob_path,
+                '-score', 'stdin',
+            ],
+            input=sol_str.encode()
+        )
         return float(sol.decode())
     except subprocess.CalledProcessError as ex: # error code <> 0
         print('-------- ERROR --------')
@@ -121,8 +140,6 @@ def get_best_sol(prob_id) -> str | None:
     best_tag = None
     for tag in get_sol_tags(prob_id):
         score = get_score(prob_id, tag)
-        if score is None:
-            continue
         if best_score == None or score > best_score:
             best_score = score
             best_tag = tag
@@ -188,17 +205,17 @@ def print_sol_stats(prob_id: int) -> dict:
 # solver CLI:
 # -p 1  // problem id
 # -pp path  // problem path
-# -timeout 120 // timeout in seconds (default = 120)
 # -out filename // output file name (default=stdout)
-# -solver two_row // solver (two_row/border/regular)
+# -timeout 120 // timeout in seconds (default = 120)
+# -s two_row // solver (two_row/border/regular)
 # -score solution_file_name // score solution and print the score to stdout (doesn't run the solver)
 
 
 def get_solver_cmd(solver_id: str, solver_args: str, prob_id: int) -> list[str]:
     prob_path = get_prob_path(prob_id)
     print(f'{solver_id}({prob_id})...')
-    cmd = ['../solver/solver']
-    cmd += ['-solver', solver_id]
+    cmd = ['脳/脳']
+    cmd += ['-s', solver_id]
     cmd += ['-pp', prob_path]
     if solver_args != '':
         cmd += solver_args.split(' ')
@@ -209,8 +226,7 @@ def run_solver(solver_id: str, solver_args: str, prob_id: int) -> str | None:
     cmd = get_solver_cmd(solver_id, solver_args, prob_id)
     sys.stdout.flush()
     try:
-        sol = subprocess.check_output(cmd)
-        return sol.decode()
+        return subprocess.check_output(cmd).decode()
     except subprocess.CalledProcessError as ex: # error code <> 0
         print('-------- ERROR --------')
         print('OK')
@@ -219,26 +235,32 @@ def run_solver(solver_id: str, solver_args: str, prob_id: int) -> str | None:
         return None
 
 
-def save_sol(solver_id: str, prob_id: int, sol_tag: str, sol: str) -> None:
+def save_sol(solver_id: str, prob_id: int, sol_tag: str, sol_str: str) -> None:
     print(f'saving {solver_id}({prob_id}) as {sol_tag}')
     sol_dir = get_sol_dir_path(prob_id)
     sol_path = f'{sol_dir}/{sol_tag}.solution'
     with io.open(sol_path, 'wb') as h:
-        h.write(sol.encode())
+        h.write(sol_str.encode())
 
 
 def solve(solver_id: str, solver_args: str, sol_tag: str, prob_id: int) -> None:
-    sol = run_solver(solver_id, solver_args, prob_id)
-    if sol is None:
+    sol_str = run_solver(solver_id, solver_args, prob_id)
+    if sol_str is None:
         print(f'{solver_id}({prob_id}) -> ERROR')
         return
-    sol_js = json.loads(sol)
-    score = get_score(sol_js)
+    score = get_score_from_str(prob_id, sol_str)
     print(f'{solver_id}({prob_id}) -> OK ({score})')
-    save_sol(solver_id, prob_id, sol_tag, sol)
+    save_sol(solver_id, prob_id, sol_tag, sol_str)
 
 
-def parsolve(solver_id, solver_args, sol_tag, start_id, end_id, job_count) -> None:
+def parsolve(
+        solver_id: str,
+        solver_args: str,
+        sol_tag: str,
+        start_id: int,
+        end_id: int,
+        job_count: int
+) -> None:
 
     def start_solving(prob_id: int) -> dict:
         cmd = get_solver_cmd(solver_id, solver_args, prob_id)
@@ -249,15 +271,15 @@ def parsolve(solver_id, solver_args, sol_tag, start_id, end_id, job_count) -> No
         )
         return { 'prob_id': prob_id, 'process': process }
 
-    def finish_solving(job, retcode) -> None:
+    def finish_solving(job, retcode: int) -> None:
         prob_id = job['prob_id']
         if retcode != 0:
             print(f'{solver_id}({prob_id}) -> ERROR ({retcode})')
             return
-        sol = job['process'].communicate()[0].decode()
-        score = get_score(sol)
+        sol_str = job['process'].communicate()[0].decode()
+        score = get_score_from_str(prob_id, sol_str)
         print(f'{solver_id}({prob_id}) -> OK ({score})')
-        save_sol(solver_id, prob_id, sol_tag, sol)
+        save_sol(solver_id, prob_id, sol_tag, sol_str)
 
     queue = list(range(start_id, end_id+1))
     pool = [None] * job_count
@@ -360,6 +382,26 @@ def update_username_request(username: str) -> None:
 
 if __name__ == '__main__':
     cmd = sys.argv[1]
+
+    if cmd == 'solve':
+        solver = sys.argv[2]
+        solver_args = sys.argv[3]
+        sol_id = sys.argv[4]
+        start_id = int(sys.argv[5])
+        end_id = int(sys.argv[6])
+        for prob_id in range(start_id, end_id+1):
+            solve(solver, solver_args, sol_id, prob_id)
+        exit(0)
+
+    if cmd == 'parsolve':
+        solver_id = sys.argv[2]
+        solver_args = sys.argv[3]
+        sol_id = sys.argv[4]
+        start_id = int(sys.argv[5])
+        end_id = int(sys.argv[6])
+        job_count = int(sys.argv[7])
+        parsolve(solver_id, solver_args, sol_id, start_id, end_id, job_count)
+        exit(0)
 
     if cmd == 'download_probs':
         for pid in all_prob_ids():
