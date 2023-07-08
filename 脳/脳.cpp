@@ -63,7 +63,7 @@ bool is_valid( const Problem & problem, const Solution & sol )
 	{
 		double x = sol.placements[i].x;
 		double y = sol.placements[i].y;
-		if (!(sx <= x && x <= sx+problem.stage_width && sy <= y && y <= sy+problem.stage_height)) return false;
+		if (!(sx <= x + 10 && x + 10 <= sx+problem.stage_width && sy <= y + 10 && y + 10 <= sy+problem.stage_height)) return false;
 		for (int j=i+1; j<n; j++)
 		{
 			double dx = x - sol.placements[j].x;
@@ -286,6 +286,7 @@ double get_score( const Problem & problem, const Solution & sol, bool use_ceil=t
 {
 	int n = (int)problem.musicians.size();
 	int m = (int)problem.attendees.size();
+    assert(n == (int)sol.placements.size());
 	double score = 0;
 
 	for (int i=0; i<n; i++)
