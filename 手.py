@@ -312,7 +312,7 @@ def parsolve(
 
 def get_best_score(prob_id: int) -> float:
     sol_tag = get_best_sol(prob_id)
-    return get_score(prob_id, sol_tag)
+    return 0 if sol_tag is None else get_score(prob_id, sol_tag)
 
 
 def get_sorted_scores():
