@@ -44,7 +44,7 @@ struct Problem {
     vector<int> musicians;
     vector<Attendee> attendees;
 	vector<Pillar> pillars;
-    FLD_BEGIN 
+    FLD_BEGIN
         FLD(room_width) FLD(room_height) FLD(stage_width) FLD(stage_height) FLD(stage_bottom_left)
         FLD(musicians) FLD(attendees) FLD(pillars)
     FLD_END
@@ -1012,7 +1012,7 @@ int main(int argc, char *argv[]) {
 		sscanf(s.c_str(), "%d", &problem_id);
 		if (problem_id >= 56) new_scoring = true;
 	}
-    
+
     int timeout = 120;
     if (auto p = args.get_arg("-timeout"))
         sscanf(p, "%d", &timeout);
@@ -1026,6 +1026,9 @@ int main(int argc, char *argv[]) {
 	if (auto s = args.get_arg("-out")) {
         fname = s;
     }
+	if (auto s = args.get_arg("-tag")) {
+		fname = format("../答/%d/%s.solution", problem_id, s);
+	}
 
     if (auto p = args.get_arg("-score")) {
         Json::Value root;
