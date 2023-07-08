@@ -381,6 +381,17 @@ def update_username_request(username: str) -> None:
     assert('Success' in res_js)
 
 
+def purge_bad_sols(prob_id: str) -> None:
+    sol_dir = get_sol_dir_path(prob_id)
+    for tag in get_sol_tags(prob_id):
+        score = get_score(prob_id, tag)
+        if score == 0:
+            print(f'bad: {prob_id}.{tag}')
+            sol_path = f'{sol_dir}/{tag}.solution'
+            # эту строку нужно раскомментировать при каждом использовании:
+            # os.remove(sol_path)
+
+
 if __name__ == '__main__':
     cmd = sys.argv[1]
 
@@ -433,6 +444,11 @@ if __name__ == '__main__':
     if cmd == 'send_all_best_lazy':
         ub = get_userboard_request()
         send_all_best_lazy(ub)
+        exit(0)
+
+    if cmd == 'purge_bad_sols':
+        for pid in all_prob_ids():
+            purge_bad_sols(pid)
         exit(0)
 
     if cmd == 'get_scoreboard':
