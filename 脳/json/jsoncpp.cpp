@@ -3080,7 +3080,7 @@ std::string valueToString(double value) {
 #endif
 #else
   if (isfinite(value)) {
-    len = snprintf(buffer, sizeof(buffer), "%.7g", value);
+    len = snprintf(buffer, sizeof(buffer), "%.16g", value);
   } else {
     // IEEE standard states that NaN values will not compare to themselves
     if (value != value) {
