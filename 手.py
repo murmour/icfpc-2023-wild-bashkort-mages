@@ -200,7 +200,7 @@ def print_sol_stats(prob_id: int) -> dict:
 
     if best is not None:
         print(f'  BEST = {best}({best_score})')
-        total_score += best_score
+        total_score += max(best_score, 0)
 
 
 # solver CLI:
