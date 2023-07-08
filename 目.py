@@ -89,8 +89,14 @@ def project(x: float, y: float) -> tuple[float, float]:
     return (x*pixel_size, ch - (y*pixel_size))
 
 
+def unproject(x: float, y: float) -> tuple[float, float]:
+    ch = canvas.winfo_height()
+    y = ch-y
+    return (x/pixel_size, y/pixel_size)
+
+
 def on_mouse_move(event) -> None:
-    (x, y) = project(event.x, event.y)
+    (x, y) = unproject(event.x, event.y)
     coord_label.config(text=f'x: {x}, y: {y}')
 
 canvas.bind("<Motion>", on_mouse_move)
