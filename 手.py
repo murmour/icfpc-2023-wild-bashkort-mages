@@ -66,7 +66,8 @@ def get_prob(prob_id: int) -> dict:
 def send_sol_request(prob_id: int, sol_tag: str) -> str:
     print(f'Sending {prob_id}.{sol_tag}...')
     sol = get_sol(prob_id, sol_tag)
-    del(sol['score'])
+    if 'score' in sol:
+        del sol['score']
     sub = { 'problem_id': prob_id, 'contents': json.dumps(sol) }
     sub_path = 'submission.js'
     with io.open(sub_path, 'w') as f:
@@ -159,12 +160,12 @@ def send_all_best() -> dict:
 
 
 def send_all_best_lazy(userboard) -> dict:
-    for i, prob_id in enumerate(all_prob_ids()):
+    for prob_id in enumerate(all_prob_ids()):
         sol_tag = get_best_sol(prob_id)
         if sol_tag is None:
             print(f'{prob_id}: -')
         score = get_score(prob_id, sol_tag)
-        remote_score = userboard["problems"][i]
+        remote_score = userboard["problems"][prob_id-1]
         if remote_score is None or score > remote_score:
             print(f'{prob_id}: {score} > {remote_score}')
             send_sol_request(prob_id, sol_tag)
@@ -356,13 +357,13 @@ def get_userboard_request() -> dict:
 def print_scoreboard(sb: dict) -> None:
     print(f'scoreboard at {sb["updated_at"]}:')
     for i, line in enumerate(sb['scoreboard']):
-        print(f'{i}. {line["username"]} = {line["score"]}')
+        print(f'{i+1}. {line["username"]} = {line["score"]}')
 
 
 def print_userboard(ub: dict) -> None:
     print(f'userboard:')
     for i, score in enumerate(ub['problems']):
-        print(f'{i} = {"-" if score is None else score}')
+        print(f'{i+1} = {"-" if score is None else score}')
 
 
 def update_username_request(username: str) -> None:
