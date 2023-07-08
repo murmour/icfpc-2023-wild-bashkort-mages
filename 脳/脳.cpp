@@ -8,6 +8,7 @@
 #include <cstdarg>
 #include <chrono>
 #include <cstring>
+#include <regex>
 
 #include "common.h"
 #include "geom2d.h"
@@ -15,6 +16,9 @@
 template<typename T> T Sqr(const T &x) { return x * x; }
 
 using namespace std;
+
+int problem_id = -1;
+bool new_scoring = false;
 
 struct Attendee {
     double x;
@@ -25,6 +29,12 @@ struct Attendee {
     FLD_END
 };
 
+struct Pillar {
+	array<double, 2> center;
+	double radius;
+	FLD_BEGIN FLD(center) FLD(radius) FLD_END
+};
+
 struct Problem {
     double room_width;
     double room_height;
@@ -33,9 +43,10 @@ struct Problem {
     array<double, 2> stage_bottom_left;
     vector<int> musicians;
     vector<Attendee> attendees;
-    FLD_BEGIN
+	vector<Pillar> pillars;
+    FLD_BEGIN 
         FLD(room_width) FLD(room_height) FLD(stage_width) FLD(stage_height) FLD(stage_bottom_left)
-        FLD(musicians) FLD(attendees)
+        FLD(musicians) FLD(attendees) FLD(pillars)
     FLD_END
 };
 
@@ -901,7 +912,8 @@ void solve(const string &infile, int timeout, const string &solver, const string
 		else if (solver == "wiggle") {
 			//if (iters > 0) break;
 			//s0 = get_random_placement(p);
-			s0 = get_border_placement(p, iters % 16);
+			//s0 = get_border_placement(p, iters % 16);
+			s0 = get_regular_border_placement(p, iters % 16);
 			s0 = solve_assignment(p, s0);
 			for (int i = 0; i < 1; i++) {
 				//auto before = s0.score;
@@ -938,7 +950,7 @@ void solve(const string &infile, int timeout, const string &solver, const string
 		{
 			best_score = s.score;
             best_solution = s;
-			fprintf(stderr, "iters: %d score: %.3lf\n", iters, s.score);
+			fprintf(stderr, "p%d: iters: %d score: %.3lf\n", problem_id, iters, s.score);
             if (!fname.empty()) writeSolution(s, fname);
 			//double my_score = get_score(p,s);
 			//printf("my score %.3lf\n", my_score);
@@ -973,6 +985,14 @@ int main(int argc, char *argv[]) {
             in_file = format("../問/%s.problem", p);
     }
 
+	regex prob_id("/(\\d)+\\.problem");
+	smatch match;
+	if (regex_search(in_file, match, prob_id)) {
+		string s = match[1].str();
+		sscanf(s.c_str(), "%d", &problem_id);
+		if (problem_id >= 56) new_scoring = true;
+	}
+    
     int timeout = 120;
     if (auto p = args.get_arg("-timeout"))
         sscanf(p, "%d", &timeout);
