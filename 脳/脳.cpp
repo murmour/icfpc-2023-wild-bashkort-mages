@@ -45,7 +45,8 @@ struct Placement {
 
 struct Solution {
     vector<Placement> placements;
-    FLD_BEGIN FLD(placements) FLD_END
+	double score = -1;
+    FLD_BEGIN FLD(placements) FLD(score, -1) FLD_END
 };
 
 struct T
@@ -392,7 +393,7 @@ vector<int> get_optimal_assignment(const vector<vector<Weight> > &a)
     return res;
 }
 
-pair<Solution, double> solve_assignment(const Problem &p, const Solution &places) {
+Solution solve_assignment(const Problem &p, const Solution &places) {
 	//cerr << "solve assignment\n";
     auto visible = calc_visible(p, places);
     int n = (int)p.musicians.size();
@@ -415,7 +416,8 @@ pair<Solution, double> solve_assignment(const Problem &p, const Solution &places
         res.placements.push_back(places.placements[ass[i]]);
         score += mat[i][ass[i]];
     }
-    return {res, -score};
+	res.score = -score;
+    return res;
 }
 
 Solution get_regular_border_placement(const Problem & p, int mask = 15)
@@ -691,6 +693,26 @@ Solution get_some_placement(const Problem &p) {
     return Solution();
 }
 
+Solution get_compact_placement(const Problem &p, int xmode = 0, int ymode = 0) {
+	int n = (int)p.musicians.size();
+	int k = (int)ceil(sqrt(n));
+	// k * k
+	Solution res;
+	double a = 10;
+	double b = p.stage_width - k * 10;
+	double x0 = a + (b - a) / 2 * xmode;
+	b = p.stage_height - k * 10;
+	double y0 = a + (b - a) / 2 * ymode;
+	for (int i = 0; i < k; i++)
+		for (int j = 0; j < k; j++) {
+			if ((int)res.placements.size() >= n) break;
+			double x = p.stage_bottom_left[0] + x0 + i * 10;
+			double y = p.stage_bottom_left[1] + y0 + j * 10;
+			res.placements.push_back({x, y});
+		}
+	return res;
+} 
+
 void writeSolution(const Solution &sol, string fname) {
     //auto f = fopen(format("../答/%d/%s.solution", problem_id, tag).c_str(), "wt");
     if (!fname.empty()) {
@@ -734,6 +756,10 @@ void solve(const string &infile, int timeout, const string &solver, const string
             s0 = get_border_placement(p, rand() % 16);
         else if (solver == "regular")
             s0 = get_regular_border_placement(p, rand() % 16);
+		else if (solver == "compact") {
+			if (iters >= 9) break;
+			s0 = get_compact_placement(p, iters % 3, iters / 3);
+		}
         else {
             fprintf(stderr, "Invalid solver: %s\n", solver.c_str());
 			exit(10);
@@ -747,13 +773,13 @@ void solve(const string &infile, int timeout, const string &solver, const string
 			fprintf(stderr, "Invalid placement!\n");
 			exit(3);
 		}
-		auto [s, score] = solve_assignment(p, s0);
+		auto s = solve_assignment(p, s0);
 		iters++;
-		if (score > best_score)
+		if (s.score > best_score)
 		{
-			best_score = score;
+			best_score = s.score;
             best_solution = s;
-			fprintf(stderr, "iters: %d score: %.3lf\n", iters, score);
+			fprintf(stderr, "iters: %d score: %.3lf\n", iters, s.score);
             if (!fname.empty()) writeSolution(s, fname);
 			//double my_score = get_score(p,s);
 			//printf("my score %.3lf\n", my_score);
@@ -805,6 +831,7 @@ int main(int argc, char *argv[]) {
     if (auto p = args.get_arg("-score")) {
         Json::Value root;
         Solution sol;
+		
         if (!readJsonFile(p, root)) { return 1; }
         if (!deserializeJson(sol, root)) { return 2; }
         Problem prob;
