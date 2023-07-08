@@ -303,6 +303,30 @@ vector< int > get_blocked2( const Problem & problem, const Solution & sol, int m
 	return res;
 }
 
+vector< int > get_blocked3( const Problem & problem, const Solution & sol, int mus_id )
+{
+	vector< int > res = get_blocked2( problem, sol, mus_id );
+	int m = (int)problem.attendees.size();
+	int k = (int)problem.pillars.size();
+	T A = T( sol.placements[mus_id].x, sol.placements[mus_id].y );
+	for (int i=0; i<m; i++)
+		if (res[i]==0)
+		{
+			T B = T( problem.attendees[i].x, problem.attendees[i].y );
+			for (int j=0; j<k; j++)
+			{
+				T C = T( problem.pillars[j].center[0], problem.pillars[j].center[1] );
+				double r = problem.pillars[j].radius;
+				if (is_blocked( A, B, C, r ))
+				{
+					res[i] = 1;
+					break;
+				}
+			}
+		}
+	return res;
+}
+
 double get_score( const Problem & problem, const Solution & sol, bool use_ceil=true )
 {
 	int n = (int)problem.musicians.size();
@@ -325,7 +349,7 @@ double get_score( const Problem & problem, const Solution & sol, bool use_ceil=t
 	for (int i=0; i<n; i++)
 	{
 		T A = T( sol.placements[i].x, sol.placements[i].y );
-		vector< int > blocked = get_blocked2( problem, sol, i );
+		vector< int > blocked = get_blocked3( problem, sol, i );
 		for (int j=0; j<m; j++)
 			if (blocked[j]==0)
 			{
@@ -350,7 +374,7 @@ vector<vector<int>> calc_visible(const Problem &p, const Solution &places) {
 	int m = (int)p.attendees.size();
     for (int i=0; i<n; i++)
 	{
-		vector< int > tmp = get_blocked2( p, places, i );
+		vector< int > tmp = get_blocked3( p, places, i );
 		//vector< int > tmp2 = get_blocked_stupid( p, places, i );
 		//if (tmp != tmp2) exit(666);
 		for (int j=0; j<m; j++)
