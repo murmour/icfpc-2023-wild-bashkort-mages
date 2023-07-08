@@ -314,6 +314,7 @@ double get_score( const Problem & problem, const Solution & sol, bool use_ceil=t
 		for (int i = 0; i < n; i++) {
 			double t = 1;
 			for (int j = 0; j < n; j++) t += 1.0 / hypot(sol.placements[i].x - sol.placements[j].x, sol.placements[i].y - sol.placements[j].y);
+			q[i] = t;
 		}
 	} else {
 		for (int i = 0; i < n; i++) q[i] = 1.0;
@@ -433,6 +434,7 @@ Solution solve_assignment(const Problem &p, const Solution &places) {
 		for (int i = 0; i < n; i++) {
 			double t = 1;
 			for (int j = 0; j < n; j++) t += 1.0 / hypot(places.placements[i].x - places.placements[j].x, places.placements[i].y - places.placements[j].y);
+			q[i] = t;
 		}
 	} else {
 		for (int i = 0; i < n; i++) q[i] = 1.0;
