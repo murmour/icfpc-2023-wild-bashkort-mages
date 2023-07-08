@@ -175,7 +175,7 @@ def print_prob_stats(prob_id: int) -> dict:
     p = get_prob(prob_id)
     print(f'{prob_id}:')
     print(f'  musicians: {len(p["musicians"])}')
-    print(f'  instuments: {len(set(p["musicians"]))}')
+    print(f'  instruments: {len(set(p["musicians"]))}')
     print(f'  attendees: {len(p["attendees"])}')
     print(f'  room_size: {p["room_width"]}x{p["room_height"]}')
     print(f'  stage_size: {p["stage_width"]}x{p["stage_height"]}')
