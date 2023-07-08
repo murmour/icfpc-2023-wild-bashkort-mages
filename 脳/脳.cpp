@@ -282,7 +282,7 @@ vector< int > get_blocked2( const Problem & problem, const Solution & sol, int m
 	return res;
 }
 
-double get_score( const Problem & problem, const Solution & sol )
+double get_score( const Problem & problem, const Solution & sol, bool use_ceil=true )
 {
 	int n = (int)problem.musicians.size();
 	int m = (int)problem.attendees.size();
@@ -299,7 +299,10 @@ double get_score( const Problem & problem, const Solution & sol )
 				double dx = A.x - B.x, dy = A.y - B.y;
 				double d2 = dx*dx + dy*dy;
 				double tmp = 1'000'000 * problem.attendees[j].tastes[problem.musicians[i]];
-				score += ceil( tmp / d2 );
+                if (use_ceil)
+				    score += ceil( tmp / d2 );
+                else
+                    score += tmp / d2;
 			}
 	}
 	return score;
@@ -355,7 +358,7 @@ vector<int> get_optimal_assignment(const vector<vector<Weight> > &a)
         do
         {
             used[j0] = true;
-            int i0 = p[j0], j1;
+            int i0 = p[j0], j1 = 0;
             Weight delta = inf;
             for (int j = 1; j <= m; ++j)
                 if (!used[j])
@@ -430,7 +433,7 @@ Solution get_regular_border_placement(const Problem & p, int mask = 15)
 					double x = sx + 10 + i*10;
 					double y = sy + (side==0 ? 10 : p.stage_height-10);
 					bool flag = true;
-					for (int j=0; j<res.placements.size(); j++)
+					for (int j=0; j<(int)res.placements.size(); j++)
 					{
 						double dx = res.placements[j].x - x;
 						double dy = res.placements[j].y - y;
@@ -443,7 +446,7 @@ Solution get_regular_border_placement(const Problem & p, int mask = 15)
 					if (flag)
 					{
 						res.placements.push_back( { x, y } );
-						if (res.placements.size() == n) return res;
+						if ((int)res.placements.size() == n) return res;
 					}
 				}
 			}
@@ -455,7 +458,7 @@ Solution get_regular_border_placement(const Problem & p, int mask = 15)
 					double x = sx + (side==2 ? 10 : p.stage_width-10);
 					double y = sy + 10 + i*10;
 					bool flag = true;
-					for (int j=0; j<res.placements.size(); j++)
+					for (int j=0; j<(int)res.placements.size(); j++)
 					{
 						double dx = res.placements[j].x - x;
 						double dy = res.placements[j].y - y;
@@ -468,17 +471,17 @@ Solution get_regular_border_placement(const Problem & p, int mask = 15)
 					if (flag)
 					{
 						res.placements.push_back( { x, y } );
-						if (res.placements.size() == n) return res;
+						if ((int)res.placements.size() == n) return res;
 					}
 				}
 			}
 		}
-	while (res.placements.size() < n)
+	while ((int)res.placements.size() < n)
 	{
 		double x = sx + (p.stage_width-20.) * rand()/(RAND_MAX-1) + 10.;
 		double y = sy + (p.stage_height-20.) * rand()/(RAND_MAX-1) + 10.;
 		bool flag = true;
-		for (int j=0; j<res.placements.size(); j++)
+		for (int j=0; j<(int)res.placements.size(); j++)
 		{
 			double dx = res.placements[j].x - x;
 			double dy = res.placements[j].y - y;
@@ -700,10 +703,9 @@ void writeSolution(const Solution &sol, string fname) {
     }
 }
 
-void solve(int problem_id, int timeout, const string &solver, const string &fname) {
+void solve(const string &infile, int timeout, const string &solver, const string &fname) {
     Json::Value root, root_s;
     Problem p;
-    auto infile = format("../問/%d.problem", problem_id);
     if (!readJsonFile(infile.c_str(), root)) {
         fprintf(stderr, "Invalid json 1!\n");
         exit(1);
@@ -713,7 +715,7 @@ void solve(int problem_id, int timeout, const string &solver, const string &fnam
         exit(1);
     }
 
-	fprintf(stderr, "id %d, solver %s, %d musicians, %d attendees, %.0lf x %.0lf\n", problem_id, solver.c_str(), p.musicians.size(), p.attendees.size(), p.room_width, p.room_height );
+	fprintf(stderr, "input %s, solver %s, %d musicians, %d attendees, %.0lf x %.0lf\n", infile.c_str(), solver.c_str(), (int)p.musicians.size(), (int)p.attendees.size(), p.room_width, p.room_height );
 
 	double best_score = 0.;
 	int iters = 0;
@@ -775,9 +777,14 @@ struct ArgParser {
 int main(int argc, char *argv[]) {
     ArgParser args = { argc, argv };
 
-    int problem_id = 1;
-    if (auto p = args.get_arg("-p"))
-        sscanf(p, "%d", &problem_id);
+    string in_file = "";
+    if (auto p = args.get_arg("-pp"))
+    {
+        in_file = p;
+    } else {
+        if (auto p = args.get_arg("-p"))
+            in_file = format("../問/%s.problem", p);
+    }
 
     int timeout = 120;
     if (auto p = args.get_arg("-timeout"))
@@ -799,8 +806,7 @@ int main(int argc, char *argv[]) {
         if (!readJsonFile(p, root)) { return 1; }
         if (!deserializeJson(sol, root)) { return 2; }
         Problem prob;
-        auto infile = format("../問/%d.problem", problem_id);
-        if (!readJsonFile(infile.c_str(), root)) {
+        if (!readJsonFile(in_file.c_str(), root)) {
             fprintf(stderr, "Invalid json 1!\n");
             exit(1);
         }
@@ -813,7 +819,7 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    solve(problem_id, timeout, solver, fname);
+    solve(in_file, timeout, solver, fname);
 	//for (int i=1; i<=45; i++)
 	//	solve(i);
     return 0;
