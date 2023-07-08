@@ -6,7 +6,7 @@
             "label": "C/C++: build solver",
             "command": "/usr/bin/g++",
             "args": [
-                "-g", "-Og", "-Wall",
+                "-g", "-O0", "-Wall",
                 "${fileDirname}/common.cpp", "${fileDirname}/main.cpp", "${fileDirname}/json/jsoncpp.cpp",
                 "-o",
                 "${fileDirname}/solver"

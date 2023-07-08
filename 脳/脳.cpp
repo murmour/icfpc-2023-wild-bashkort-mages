@@ -10,6 +10,7 @@
 #include <cstring>
 
 #include "common.h"
+#include "geom2d.h"
 
 template<typename T> T Sqr(const T &x) { return x * x; }
 
@@ -65,13 +66,20 @@ bool is_valid( const Problem & problem, const Solution & sol )
 	{
 		double x = sol.placements[i].x;
 		double y = sol.placements[i].y;
-		if (!(sx <= x + 10 && x + 10 <= sx+problem.stage_width && sy <= y + 10 && y + 10 <= sy+problem.stage_height)) return false;
+		if (!(sx <= x + 10 && x + 10 <= sx+problem.stage_width && sy <= y + 10 && y + 10 <= sy+problem.stage_height)) 
+		{
+			fprintf(stderr, "mus %d is out of stage: (%.3f, %.3f)\n", i, x, y);
+			return false;
+		}
 		for (int j=i+1; j<n; j++)
 		{
 			double dx = x - sol.placements[j].x;
 			double dy = y - sol.placements[j].y;
-			if (dx*dx + dy*dy < 100.0)
+			if (dx*dx + dy*dy < 100.0) {
+				double dist = hypot(dx, dy);
+				fprintf(stderr, "mus %d and %d are too close: %.8f\n", i, j, dist);
 				return false;
+			}
 		}
 	}
 	return true;
@@ -727,8 +735,104 @@ void writeSolution(const Solution &sol, string fname) {
     }
 }
 
-void wiggle(const Problem &p, const Solution &sol) {
-    
+inline double score_f_no_ceil(double x1, double y1, double x2, double y2, double taste) {
+	double d2 = Sqr(x1 - x2) + Sqr(y1 - y2);
+	double tmp = 1'000'000 * taste;     
+	return tmp / d2;
+}
+
+Solution wiggle(const Problem &p, const Solution &sol) {
+    auto visible = calc_visible(p, sol);
+	int n = (int)p.musicians.size();
+	int m = (int)p.attendees.size();
+	const double eps = 1e-9;
+
+	double sx1 = p.stage_bottom_left[0] + 10;
+	double sx2 = sx1 + p.stage_width - 20;
+	double sy1 = p.stage_bottom_left[1] + 10;
+	double sy2 = sy1 + p.stage_height - 20;
+
+	Solution res = sol;
+	auto &cur = res.placements;
+	double dstep = 0.01;
+	double step = 10;
+
+	for (int big_iter = 0; big_iter < 10; big_iter++) {
+		bool changed = false;
+		for (int iter = 0; iter < 500; iter++) {
+			double best_delta = 0;
+			int best_idx = -1;
+			double best_dist;
+			Placement best_pos;
+
+			for (int i = 0; i < n; i++) {
+				double x0 = cur[i].x;
+				double y0 = cur[i].y;
+				double base = 0;
+				double dx = 0;
+				double dy = 0;
+				for (int j = 0; j < m; j++) if (visible[i][j]) {
+					double taste = p.attendees[j].tastes[p.musicians[i]];
+					base += score_f_no_ceil(x0, y0, p.attendees[j].x, p.attendees[j].y, taste);
+					dx += score_f_no_ceil(x0 + dstep, y0, p.attendees[j].x, p.attendees[j].y, taste);
+					dy += score_f_no_ceil(x0, y0 + dstep, p.attendees[j].x, p.attendees[j].y, taste);
+				}
+				Point grad(dx - base, dy - base);
+				if (x0 <= sx1 + eps) grad.x = max(grad.x, 0.0);
+				if (y0 <= sy1 + eps) grad.y = max(grad.y, 0.0);
+				if (x0 >= sx2 - eps) grad.x = min(grad.x, 0.0);
+				if (y0 >= sy2 - eps) grad.y = min(grad.y, 0.0);
+				if (grad.len2() == 0) continue; // probably noone is visible
+				auto dir = grad.normalized();
+				// get max distance that we can move
+				double dist = step;
+				if (dir.x > eps)
+					dist = min(dist, (sx2 - x0) / dir.x);
+				if (dir.x < -eps)
+					dist = min(dist, (sx1 - x0) / dir.x);
+				if (dir.y > eps)
+					dist = min(dist, (sy2 - y0) / dir.y);
+				if (dir.y < -eps)
+					dist = min(dist, (sy1 - y0) / dir.y);
+				Point p0(x0, y0);
+				auto line = Line::PP(p0, p0 + dir);
+				for (int j = 0; j < n; j++) if (i != j) {
+					auto h = abs(line.at({ cur[j].x, cur[j].y }));
+					if (h >= 10) continue;
+					auto v = p0.to({ cur[j].x, cur[j].y });
+					double t = v.dot(dir);
+					if (t < 0) continue;
+					double d = t - sqrt(100 - h * h);
+					dist = min(dist, d);
+				}
+				dist = max(0.0, dist - 1e-6);
+				auto tgt = p0 + dir * dist;
+				double new_score = 0;
+				for (int j = 0; j < m; j++) if (visible[i][j]) {
+					double taste = p.attendees[j].tastes[p.musicians[i]];
+					new_score += score_f_no_ceil(tgt.x, tgt.y, p.attendees[j].x, p.attendees[j].y, taste);
+				}
+				double delta = new_score - base;
+				if (delta > best_delta) {
+					best_delta = delta;
+					best_idx = i;
+					best_pos = {tgt.x, tgt.y};
+					best_dist = dist;
+				}
+			}
+			if (best_idx != -1) {
+				changed = true;
+				//fprintf(stderr, "delta = %.3f, idx = %d, dist = %.3f, tgt = (%.3f, %.3f)\n", best_delta, best_idx, best_dist, best_pos.x, best_pos.y);
+				cur[best_idx] = best_pos;
+			} else {
+				break;
+			}
+			//if (best_dist < 0.1 * step) break;
+		}
+		if (changed) visible = calc_visible(p, res);
+		step = step * 0.5;
+	}
+	return res;
 }
 
 inline double score_f(double x1, double y1, double x2, double y2, double taste) {
@@ -794,6 +898,19 @@ void solve(const string &infile, int timeout, const string &solver, const string
             s0 = get_border_placement(p, rand() % 16);
         else if (solver == "regular")
             s0 = get_regular_border_placement(p, rand() % 16);
+		else if (solver == "wiggle") {
+			//if (iters > 0) break;
+			//s0 = get_random_placement(p);
+			s0 = get_border_placement(p, iters % 16);
+			s0 = solve_assignment(p, s0);
+			for (int i = 0; i < 1; i++) {
+				//auto before = s0.score;
+				s0 = wiggle(p, s0);
+				s0 = solve_assignment(p, s0);
+				//auto after = s0.score;
+				//fprintf(stderr, "wiggle = %.0f\n", after - before);
+			}
+		}
 		else if (solver == "compact") {
 			if (iters >= 9) break;
 			s0 = get_compact_placement(p, iters % 3, iters / 3);

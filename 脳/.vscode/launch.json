@@ -6,7 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/solver",
-            "args": [],
+            "args": ["-p", "52", "-s", "random", "-out", "wiggle.solution"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
