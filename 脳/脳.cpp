@@ -308,6 +308,17 @@ double get_score( const Problem & problem, const Solution & sol, bool use_ceil=t
 	int n = (int)problem.musicians.size();
 	int m = (int)problem.attendees.size();
     assert(n == (int)sol.placements.size());
+
+	auto q = vector<double>(n);
+	if (new_scoring) {
+		for (int i = 0; i < n; i++) {
+			double t = 1;
+			for (int j = 0; j < n; j++) t += 1.0 / hypot(sol.placements[i].x - sol.placements[j].x, sol.placements[i].y - sol.placements[j].y);
+		}
+	} else {
+		for (int i = 0; i < n; i++) q[i] = 1.0;
+	}
+
 	double score = 0;
 
 	for (int i=0; i<n; i++)
@@ -322,9 +333,9 @@ double get_score( const Problem & problem, const Solution & sol, bool use_ceil=t
 				double d2 = dx*dx + dy*dy;
 				double tmp = 1'000'000 * problem.attendees[j].tastes[problem.musicians[i]];
                 if (use_ceil)
-				    score += ceil( tmp / d2 );
+				    score += ceil(q[i] * ceil( tmp / d2 ));
                 else
-                    score += tmp / d2;
+                    score += q[i] * tmp / d2;
 			}
 	}
 	return score;
@@ -417,6 +428,15 @@ Solution solve_assignment(const Problem &p, const Solution &places) {
     auto visible = calc_visible(p, places);
     int n = (int)p.musicians.size();
     int m = (int)p.attendees.size();
+	auto q = vector<double>(n);
+	if (new_scoring) {
+		for (int i = 0; i < n; i++) {
+			double t = 1;
+			for (int j = 0; j < n; j++) t += 1.0 / hypot(places.placements[i].x - places.placements[j].x, places.placements[i].y - places.placements[j].y);
+		}
+	} else {
+		for (int i = 0; i < n; i++) q[i] = 1.0;
+	}
     vector<vector<double>> mat(n, vector<double>(n));
     for (int i = 0; i < n; i++)
         for (int j = 0; j < n; j++) {
@@ -424,7 +444,7 @@ Solution solve_assignment(const Problem &p, const Solution &places) {
             double t = 0;
             for (int k = 0; k < m; k++) if (visible[j][k]) {
                 double d2 = Sqr(places.placements[j].x - p.attendees[k].x) + Sqr(places.placements[j].y - p.attendees[k].y);
-                t += ceil(1000000 * p.attendees[k].tastes[inst] / d2);
+                t += ceil(q[i] * ceil(1000000 * p.attendees[k].tastes[inst] / d2));
             }
             mat[i][j] = -t;
         }
@@ -773,7 +793,7 @@ Solution wiggle(const Problem &p, const Solution &sol) {
 		for (int iter = 0; iter < 500; iter++) {
 			double best_delta = 0;
 			int best_idx = -1;
-			double best_dist;
+			//double best_dist;
 			Placement best_pos;
 
 			for (int i = 0; i < n; i++) {
@@ -828,7 +848,7 @@ Solution wiggle(const Problem &p, const Solution &sol) {
 					best_delta = delta;
 					best_idx = i;
 					best_pos = {tgt.x, tgt.y};
-					best_dist = dist;
+					//best_dist = dist;
 				}
 			}
 			if (best_idx != -1) {
