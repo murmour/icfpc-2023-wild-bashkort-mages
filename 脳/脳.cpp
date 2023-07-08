@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstdarg>
 #include <chrono>
+#include <cstring>
 
 #include "common.h"
 
@@ -96,7 +97,7 @@ vector< int > get_blocked_stupid( const Problem & problem, const Solution & sol,
 	int n = (int)problem.musicians.size();
 	int m = (int)problem.attendees.size();
 	vector< int > res = vector< int >( m, 0 );
-	
+
 	T A = T( sol.placements[mus_id].x, sol.placements[mus_id].y );
 	for (int i=0; i<m; i++)
 	{
@@ -187,7 +188,7 @@ vector< int > get_blocked2( const Problem & problem, const Solution & sol, int m
 	int n = (int)problem.musicians.size();
 	T A = T( sol.placements[mus_id].x, sol.placements[mus_id].y );
 	vector< pair< double, int > > vecd; // < d2, id >
-	
+
 	for (int i=0; i<n; i++)
 		if (i!=mus_id)
 		{
@@ -199,7 +200,7 @@ vector< int > get_blocked2( const Problem & problem, const Solution & sol, int m
 
 	vector< vector< pair< double, int > > > vec; // < angle, id >
 	double R = 9.;
-	
+
 	vector< pair< double, int > > vec_cur;
 	vector< double > max_angle;
 	for (int i=0; i<n; i++)
@@ -685,19 +686,25 @@ Solution get_some_placement(const Problem &p) {
     return Solution();
 }
 
-void writeSolution(const Solution &sol, const char *tag, int problem_id) {
-    auto f = fopen(format("../答/%d/%s.solution", problem_id, tag).c_str(), "wt");
-    if (!f) exit(13);
-    Json::FastWriter fw;
-    fprintf(f, "%s", fw.write(serializeJson(sol)).c_str());
-    fclose(f);
+void writeSolution(const Solution &sol, string fname) {
+    //auto f = fopen(format("../答/%d/%s.solution", problem_id, tag).c_str(), "wt");
+    if (!fname.empty()) {
+        auto f = fopen(fname.c_str(), "wt");
+        if (!f) exit(13);
+        Json::FastWriter fw;
+        fprintf(f, "%s", fw.write(serializeJson(sol)).c_str());
+        fclose(f);
+    } else {
+        Json::FastWriter fw;
+        printf("%s", fw.write(serializeJson(sol)).c_str());
+    }
 }
 
-void solve(int problem_id) {
+void solve(int problem_id, int timeout, const string &solver, const string &fname) {
     Json::Value root, root_s;
     Problem p;
-    auto fname = format("../問/%d.problem", problem_id);
-    if (!readJsonFile(fname.c_str(), root)) {
+    auto infile = format("../問/%d.problem", problem_id);
+    if (!readJsonFile(infile.c_str(), root)) {
         fprintf(stderr, "Invalid json 1!\n");
         exit(1);
     }
@@ -706,16 +713,28 @@ void solve(int problem_id) {
         exit(1);
     }
 
-	printf("id %d, %d musicians, %d attendees, %.0lf x %.0lf\n", problem_id, p.musicians.size(), p.attendees.size(), p.room_width, p.room_height );
+	fprintf(stderr, "id %d, solver %s, %d musicians, %d attendees, %.0lf x %.0lf\n", problem_id, solver.c_str(), p.musicians.size(), p.attendees.size(), p.room_width, p.room_height );
 
 	double best_score = 0.;
 	int iters = 0;
 	int start_time = clock();
+    Solution best_solution;
 	while(true)
 	{
 		int cur_time = clock();
-		if (cur_time - start_time > 120*CLOCKS_PER_SEC) break;
-		auto s0 = get_two_row_border_placement(p, rand()%16);
+		if (cur_time - start_time > timeout*CLOCKS_PER_SEC) break;
+        Solution s0;
+        if (solver == "two_row")
+		    s0 = get_two_row_border_placement(p, rand()%16);
+        else if (solver == "border")
+            s0 = get_border_placement(p, rand() % 16);
+        else if (solver == "regular")
+            s0 = get_border_placement(p, rand() % 16);
+        else {
+            fprintf(stderr, "Invalid solver: %s\n", solver.c_str());
+			exit(10);
+        }
+
 		if (s0.placements.empty()) {
 			exit(2);
 		}
@@ -729,17 +748,73 @@ void solve(int problem_id) {
 		if (score > best_score)
 		{
 			best_score = score;
-			writeSolution(s, "liszt_tr_border", problem_id);
-			printf("iters: %d score: %.3lf\n", iters, score);
+            best_solution = s;
+			fprintf(stderr, "iters: %d score: %.3lf\n", iters, score);
+            if (!fname.empty()) writeSolution(s, fname);
 			//double my_score = get_score(p,s);
 			//printf("my score %.3lf\n", my_score);
 		}
 	}
+    if (best_solution.placements.empty()) {
+        exit(11);
+    }
+    writeSolution(best_solution, fname);
 }
 
-int main() {
-	//solve(1);
-	for (int i=1; i<=45; i++)
-		solve(i);
+struct ArgParser {
+	int argc;
+	char **argv;
+	char * get_arg(const char * name) {
+		for (int i = 1; i + 1 < argc; i += 2)
+			if (strcmp(argv[i], name) == 0)
+				return argv[i + 1];
+		return nullptr;
+	}
+};
+
+int main(int argc, char *argv[]) {
+    ArgParser args = { argc, argv };
+
+    int problem_id = 1;
+    if (auto p = args.get_arg("-p"))
+        sscanf(p, "%d", &problem_id);
+
+    int timeout = 120;
+    if (auto p = args.get_arg("-timeout"))
+        sscanf(p, "%d", &timeout);
+
+    string solver = "regular";
+	if (auto s = args.get_arg("-s")) {
+        solver = s;
+    }
+
+    string fname = "";
+	if (auto s = args.get_arg("-out")) {
+        fname = s;
+    }
+
+    if (auto p = args.get_arg("-score")) {
+        Json::Value root;
+        Solution sol;
+        if (!readJsonFile(p, root)) { return 1; }
+        if (!deserializeJson(sol, root)) { return 2; }
+        Problem prob;
+        auto infile = format("../問/%d.problem", problem_id);
+        if (!readJsonFile(infile.c_str(), root)) {
+            fprintf(stderr, "Invalid json 1!\n");
+            exit(1);
+        }
+        if (!deserializeJson(prob, root)) {
+            fprintf(stderr, "Invalid json 3!\n");
+            exit(1);
+        }
+        double score = get_score(prob, sol);
+        printf("%.3lf", score);
+        return 0;
+    }
+
+    solve(problem_id, timeout, solver, fname);
+	//for (int i=1; i<=45; i++)
+	//	solve(i);
     return 0;
 }
