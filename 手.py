@@ -112,7 +112,7 @@ def get_score(prob_id: int, sol_tag: str) -> float | None:
         print('-------- ERROR --------')
         print(ex)
         sys.stdout.flush()
-        return None
+        return 0
 
 
 def get_best_sol(prob_id) -> str | None:
@@ -300,8 +300,11 @@ def get_sorted_scores():
     for pid in all_prob_ids():
         data.append((get_best_score(pid), pid))
     data.sort(reverse=True)
+    tot = 0
     for score, pid in data:
+        tot += max(score, 0)
         print('%12.0f %3d' % (score, pid))
+    print('Total = %.0f', tot)
 
 
 def get_scoreboard_request() -> dict:
