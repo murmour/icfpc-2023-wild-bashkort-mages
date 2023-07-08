@@ -293,6 +293,41 @@ def get_sorted_scores():
         print('%12.0f %3d' % (score, pid))
 
 
+def get_scoreboard_request() -> dict:
+    res = subprocess.check_output([
+        'curl',
+        '--compressed',
+        f'{api}/scoreboard'
+    ])
+    time.sleep(1)
+    return json.loads(res.decode('utf-8'))
+
+
+def get_userboard_request() -> dict:
+    res = subprocess.check_output([
+        'curl',
+        '--compressed',
+        '-H', f'Authorization: Bearer {api_key}',
+        f'{api}/userboard'
+    ])
+    time.sleep(1)
+    res_js = json.loads(res.decode('utf-8'))
+    assert('Success' in res_js)
+    return res_js['Success']
+
+
+def print_scoreboard(sb: dict) -> None:
+    print(f'scoreboard at {sb["updated_at"]}:')
+    for i, line in enumerate(sb['scoreboard']):
+        print(f'{i}. {line["username"]} = {line["score"]}')
+
+
+def print_userboard(sb: dict) -> None:
+    print(f'userboard:')
+    for i, score in enumerate(sb['problems']):
+        print(f'{i} = {"-" if score is None else score}')
+
+
 def update_username_request(username: str) -> None:
     data = json.dumps({ 'username': username })
     res = subprocess.check_output([
@@ -337,6 +372,16 @@ if __name__ == '__main__':
         best = get_local_best()
         for prob_id, sol_tag in best.items():
             send_sol_request(prob_id, sol_tag)
+        exit(0)
+
+    if cmd == 'get_scoreboard':
+        sb = get_scoreboard_request()
+        print_scoreboard(sb)
+        exit(0)
+
+    if cmd == 'get_userboard':
+        ub = get_userboard_request()
+        print_userboard(ub)
         exit(0)
 
     if cmd == 'update_username':
