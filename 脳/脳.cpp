@@ -429,6 +429,7 @@ Solution solve_assignment(const Problem &p, const Solution &places) {
     auto visible = calc_visible(p, places);
     int n = (int)p.musicians.size();
     int m = (int)p.attendees.size();
+	/*
 	auto q = vector<double>(n);
 	if (new_scoring) {
 		for (int i = 0; i < n; i++) {
@@ -439,6 +440,7 @@ Solution solve_assignment(const Problem &p, const Solution &places) {
 	} else {
 		for (int i = 0; i < n; i++) q[i] = 1.0;
 	}
+	*/
     vector<vector<double>> mat(n, vector<double>(n));
     for (int i = 0; i < n; i++)
         for (int j = 0; j < n; j++) {
@@ -446,7 +448,7 @@ Solution solve_assignment(const Problem &p, const Solution &places) {
             double t = 0;
             for (int k = 0; k < m; k++) if (visible[j][k]) {
                 double d2 = Sqr(places.placements[j].x - p.attendees[k].x) + Sqr(places.placements[j].y - p.attendees[k].y);
-                t += ceil(q[i] * ceil(1000000 * p.attendees[k].tastes[inst] / d2));
+                t += ceil(1000000 * p.attendees[k].tastes[inst] / d2);
             }
             mat[i][j] = -t;
         }
@@ -457,7 +459,10 @@ Solution solve_assignment(const Problem &p, const Solution &places) {
         res.placements.push_back(places.placements[ass[i]]);
         score += mat[i][ass[i]];
     }
-	res.score = -score;
+	if (new_scoring)
+		res.score = get_score(p, res);
+	else
+		res.score = -score;
     return res;
 }
 
