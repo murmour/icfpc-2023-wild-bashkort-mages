@@ -7,6 +7,7 @@ import 手
 
 start_prob = sys.argv[1] if len(sys.argv) >= 2 else None
 pixel_size = 1
+suki_mode = False
 
 
 root = tk.Tk()
@@ -109,10 +110,26 @@ def draw_dot(x, y, fill, tag) -> None:
     )
 
 
-def draw_prob() -> None:
-    canvas.delete('prob')
+def fit_pixel_size(w: float, h: float) -> None:
+    global pixel_size
+    cw = canvas.winfo_width()
+    ch = canvas.winfo_height()
+    pixel_size = min(cw/w, ch/h)
+
+
+def fit_pixel_size_to_prob() -> None:
     if prob is None:
         return
+    rw = prob['room_width']
+    rh = prob['room_height']
+    fit_pixel_size(rw, rh)
+
+
+def draw_prob() -> None:
+    canvas.delete('prob')
+    if suki_mode or prob is None:
+        return
+    fit_pixel_size_to_prob()
 
     # room
     rw = prob['room_width']
@@ -156,8 +173,9 @@ def draw_prob() -> None:
 
 def draw_sol() -> None:
     canvas.delete('sol')
-    if sol is None:
+    if suki_mode or sol is None:
         return
+    fit_pixel_size_to_prob()
     for p in sol['placements']:
         x = p['x']
         y = p['y']
@@ -165,27 +183,45 @@ def draw_sol() -> None:
         draw_dot(x0, y0, 'black', 'sol')
 
 
-def fit_pixel_size(w: float, h: float) -> None:
-    global pixel_size
-    cw = canvas.winfo_width()
-    ch = canvas.winfo_height()
-    pixel_size = min(cw/w, ch/h)
+def suki_to_color(suki: float) -> str:
+    if suki > 0:
+        return 'red'
+    if suki < 0:
+        return 'blue'
+    return 'white'
 
 
-def fit_pixel_size_to_prob() -> None:
-    if prob is None:
+def draw_suki() -> None:
+    canvas.delete('suki')
+    if not suki_mode or prob is None:
         return
-    rw = prob['room_width']
-    rh = prob['room_height']
-    fit_pixel_size(rw, rh)
+
+    ms = prob["musicians"]
+    ats = prob["attendees"]
+    ats_ct = len(ats)
+    ins_ct = len(set(ms))
+    fit_pixel_size(ats_ct, ins_ct)
+
+    (x1, y1) = project(ats_ct, ins_ct)
+    canvas.create_rectangle(
+        0, 0, x1, y1,
+        fill='white', width=0, tags='suki'
+    )
+
+    for j, a in enumerate(ats):
+        for i in range(ins_ct):
+            (x0, y0) = project(j, i)
+            (x1, y1) = project(j+1, i+1)
+            canvas.create_rectangle(
+                x0, y0, x1, y1,
+                fill = suki_to_color(a['tastes'][i]), width=0, tags='suki'
+            )
 
 
-def on_resize(event):
-    old_pixel_size = pixel_size
-    fit_pixel_size_to_prob()
-    if pixel_size != old_pixel_size:
-        draw_prob()
-        draw_sol()
+def on_resize(event) -> None:
+    draw_prob()
+    draw_sol()
+    draw_suki()
 
 canvas.bind('<Configure>', on_resize)
 
@@ -207,6 +243,7 @@ def switch_sol(sol_tag: str) -> None:
     global sol
     if sol_tag == '':
         canvas.delete('sol')
+        sol = None
         return
     if ':' in sol_tag:
         sol_tag = sol_tag.partition(':')[0]
@@ -222,11 +259,11 @@ def switch_prob(prob_id: int) -> None:
     global sol_tags, prob
 
     prob = 手.get_prob(prob_id)
-    best_score = 手.get_best_score(prob_id)
-    fit_pixel_size_to_prob()
     draw_prob()
+    draw_suki()
     update_top_label()
 
+    best_score = 手.get_best_score(prob_id)
     def f(tag):
         return (tag, 手.get_score(prob_id, tag))
     sol_tags = [ f(tag) for tag in 手.get_sol_tags(prob_id) ]
@@ -257,6 +294,15 @@ sol_cb.bind('<<ComboboxSelected>>', sol_changed)
 
 switch_prob(int(prob_cb.get()))
 switch_sol(sol_cb.get())
+
+
+@key('s')
+def toggle_suki() -> None:
+    global suki_mode
+    suki_mode = not suki_mode
+    draw_prob()
+    draw_sol()
+    draw_suki()
 
 
 @key('Right')
@@ -304,7 +350,7 @@ def prev_sol() -> None:
 
 
 @key('Escape')
-def quit():
+def quit() -> None:
     exit(0)
 
 
