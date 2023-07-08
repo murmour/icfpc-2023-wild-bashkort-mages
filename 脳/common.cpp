@@ -10,6 +10,7 @@
 #include <vector>
 #include <random>
 #include <cstdarg>
+#include <cstring>
 
 static int nifty_counter; // zero initialized at load time
 static typename std::aligned_storage<sizeof(Factory), alignof (Factory)>::type
@@ -221,7 +222,8 @@ _RefIterator _get_iterator(int key)
 
 bool readJsonFile(const char *fname, Json::Value &v)
 {
-	FILE *f = fopen(fname, "rt");
+	bool std = strcmp(fname, "stdin") == 0;
+	FILE *f = std ? stdin : fopen(fname, "rt");
 	if (!f)
 	{
 		//printf("Failed to open %s\n", fname);
@@ -231,7 +233,8 @@ bool readJsonFile(const char *fname, Json::Value &v)
 	char buf[buf_size];
 	std::string json;
 	while (fgets(buf, buf_size, f)) json.append(buf);
-	fclose(f);
+	if (!std)
+		fclose(f);
 	Json::Reader r;
 	return r.parse(json, v, false);
 }
