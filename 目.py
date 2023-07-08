@@ -194,6 +194,7 @@ def update_top_label() -> None:
 def switch_sol(sol_tag: str) -> None:
     global sol
     if sol_tag == '':
+        canvas.delete('sol')
         return
     prob_id = int(prob_cb.get())
     sol = 手.get_sol(prob_id, sol_tag)
