@@ -733,7 +733,7 @@ void solve(const string &infile, int timeout, const string &solver, const string
         else if (solver == "border")
             s0 = get_border_placement(p, rand() % 16);
         else if (solver == "regular")
-            s0 = get_border_placement(p, rand() % 16);
+            s0 = get_regular_border_placement(p, rand() % 16);
         else {
             fprintf(stderr, "Invalid solver: %s\n", solver.c_str());
 			exit(10);
