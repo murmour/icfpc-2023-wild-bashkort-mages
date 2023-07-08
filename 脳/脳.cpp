@@ -57,6 +57,7 @@ struct T
 bool is_valid( const Problem & problem, const Solution & sol )
 {
 	int n = (int)problem.musicians.size();
+	if ((int)sol.placements.size() != n) return false;
 	double sx = problem.stage_bottom_left[0];
 	double sy = problem.stage_bottom_left[1];
 	for (int i=0; i<n; i++)
@@ -815,6 +816,10 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Invalid json 3!\n");
             exit(1);
         }
+		if (!is_valid(prob, sol)) {
+			fprintf(stderr, "Invalid solution!\n");
+            exit(10);
+		}
         double score = get_score(prob, sol);
         printf("%.3lf", score);
         return 0;
