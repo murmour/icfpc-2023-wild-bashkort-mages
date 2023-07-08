@@ -9,6 +9,7 @@
 #include <chrono>
 #include <cstring>
 #include <regex>
+#include <random>
 
 #include "common.h"
 #include "geom2d.h"
@@ -783,6 +784,96 @@ Solution get_compact_placement(const Problem &p, int xmode = 0, int ymode = 0) {
 	return res;
 }
 
+static double sqdist(double x0, double y0, double x1, double y1) {
+    return Sqr(x1-x0) + Sqr(y1-y0);
+}
+
+// unfinished
+Solution get_spiral_placement(const Problem &p, int iter) {
+    const int n = (int)p.musicians.size();
+    const double sw = p.stage_width;
+    const double sh = p.stage_height;
+    const double center_x = sw/2;
+    const double center_y = sh/2;
+    const double a = 5;
+    const double b = 5;
+    Solution res;
+    fprintf(stderr, "spiral scene: %f %f\n", sw, sh);
+
+    // first point
+    double prev_x = center_x;
+    double prev_y = center_y;
+    int pts = 1;
+    res.placements.push_back({
+        p.stage_bottom_left[0] + prev_x,
+        p.stage_bottom_left[1] + prev_y
+    });
+
+    int i = 1;
+    while (pts < n) {
+        const double angle = 0.01 * i;
+        const double x = center_x + (a + b*angle)*cos(angle);
+        const double y = center_y + (a + b*angle)*sin(angle);
+        if (x < 10 || y < 10 || sw-x < 10 || sh-y < 10) {
+            fprintf(stderr, "hit wall: %f %f\n", x, y);
+            exit(10);
+        }
+        if (sqdist(x, y, prev_x, prev_y) > 100) {
+            fprintf(stderr, "spiral point: %f %f\n", x, y);
+            const double rx = p.stage_bottom_left[0] + x;
+            const double ry = p.stage_bottom_left[1] + y;
+            res.placements.push_back({rx, ry});
+            prev_x = x;
+            prev_y = y;
+            pts++;
+        }
+        i++;
+    }
+    return res;
+}
+
+Solution get_normal_placement(const Problem &p) {
+    const int n = (int)p.musicians.size();
+    const double sx = p.stage_bottom_left[0];
+    const double sy = p.stage_bottom_left[1];
+    const double sw = p.stage_width;
+    const double sh = p.stage_height;
+    const double center_x = sx + sw/2;
+    const double center_y = sy + sh/2;
+
+    std::random_device rd {};
+    std::mt19937 gen {rd()};
+    // вместе хардкода 4 нужно как-то поумнее подбирать дисперсию
+    std::normal_distribution<double> dx {center_x, sw/4};
+    std::normal_distribution<double> dy {center_y, sh/4};
+
+    Solution res;
+    for (int i = 0; i < n; i++) {
+        while (1) {
+            const double x = dx(gen);
+            if (x-10 < sx || x+10 > sx+sw)
+                continue;
+            const double y = dy(gen);
+            if (y-10 < sy || y+10 > sy+sh)
+                continue;
+            bool flag = true;
+            for (int j = 0; j < i; j++) {
+                const double dx = res.placements[j].x - x;
+                const double dy = res.placements[j].y - y;
+                if (dx*dx + dy*dy < 100) {
+                    flag = false;
+                    break;
+                }
+            }
+            if (flag) {
+                res.placements.push_back({ x, y });
+                break;
+            }
+        }
+    }
+    return res;
+}
+
 void writeSolution(const Solution &sol, string fname) {
     //auto f = fopen(format("../答/%d/%s.solution", problem_id, tag).c_str(), "wt");
     if (!fname.empty()) {
@@ -931,7 +1022,7 @@ vector<double> get_instrument_scores(const Problem &p) {
 	return res;
 }
 
-void solve(const string &infile, int timeout, const string &solver, const string &fname) {
+void solve(const string &infile, int timeout, int wiggles, const string &solver, const string &fname) {
     Json::Value root, root_s;
     Problem p;
     if (!readJsonFile(infile.c_str(), root)) {
@@ -966,7 +1057,7 @@ void solve(const string &infile, int timeout, const string &solver, const string
 			//s0 = get_border_placement(p, iters % 16);
 			s0 = get_regular_border_placement(p, iters % 16);
 			s0 = solve_assignment(p, s0);
-			for (int i = 0; i < 1; i++) {
+			for (int i = 0; i < wiggles; i++) {
 				//auto before = s0.score;
 				s0 = wiggle(p, s0);
 				s0 = solve_assignment(p, s0);
@@ -977,6 +1068,17 @@ void solve(const string &infile, int timeout, const string &solver, const string
 		else if (solver == "compact") {
 			if (iters >= 9) break;
 			s0 = get_compact_placement(p, iters % 3, iters / 3);
+		}
+		else if (solver == "spiral") {
+			s0 = get_spiral_placement(p, iters);
+            if (iters > 0) break;
+		}
+		else if (solver == "normal") {
+			s0 = get_normal_placement(p);
+			for (int i = 0; i < wiggles; i++) {
+				s0 = solve_assignment(p, s0);
+				s0 = wiggle(p, s0);
+			}
 		}
 		else if (solver == "stats") {
 			print_stats(p);
@@ -1048,6 +1150,10 @@ int main(int argc, char *argv[]) {
     if (auto p = args.get_arg("-timeout"))
         sscanf(p, "%d", &timeout);
 
+    int wiggles = 0;
+    if (auto p = args.get_arg("-wiggles"))
+        sscanf(p, "%d", &wiggles);
+
     string solver = "regular";
 	if (auto s = args.get_arg("-s")) {
         solver = s;
@@ -1085,7 +1191,7 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    solve(in_file, timeout, solver, fname);
+    solve(in_file, timeout, wiggles, solver, fname);
 	//for (int i=1; i<=45; i++)
 	//	solve(i);
     return 0;
