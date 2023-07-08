@@ -268,7 +268,11 @@ def switch_prob(prob_id: int) -> None:
         return (tag, 手.get_score(prob_id, tag))
     sol_tags = [ f(tag) for tag in 手.get_sol_tags(prob_id) ]
     sol_tags.sort(key = lambda x: x[1], reverse = True)
-    sol_tags = [ f'{x[0]}: {(x[1]/best_score):0,.2f}' for x in sol_tags ]
+    def f(score):
+        if score == 0 or best_score == 0:
+            return -1
+        return score/best_score
+    sol_tags = [ f'{x[0]}: {f(x[1]):0,.2f}' for x in sol_tags ]
 
     sol_cb['values'] = sol_tags
     if len(sol_tags) == 0:

@@ -159,6 +159,7 @@ def send_all_best() -> dict:
         sol_tag = get_best_sol(prob_id)
         if sol_tag is None:
             print(f'{prob_id}: -')
+            continue
         send_sol_request(prob_id, sol_tag)
 
 
@@ -167,6 +168,7 @@ def send_all_best_lazy(userboard) -> dict:
         sol_tag = get_best_sol(prob_id)
         if sol_tag is None:
             print(f'{prob_id}: -')
+            continue
         score = get_score(prob_id, sol_tag)
         remote_score = userboard["problems"][prob_id-1]
         if remote_score is None or score > remote_score:
