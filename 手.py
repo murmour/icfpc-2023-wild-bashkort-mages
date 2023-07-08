@@ -16,33 +16,47 @@ api_key = (
     '2OTc5NH0.svNmE8_E5X7tEQjnqNF9rtdlgOckN21pZJ85br6uFOw'
 )
 
-prob_count = 45
+prob_count = 55
 
 
 def all_prob_ids() -> list[int]:
-    return [ i+1 for i in range(prob_count) ]
+    return [ i+1 for i in range(55) ]
 
 
 def get_prob_request(id: int) -> dict:
-    res = subprocess.check_output(
-        ['curl',
-         '--compressed',
-         '-H', f'Authorization: Bearer {api_key}',
-         f'{api}/problem?problem_id={id}' ])
+    res = subprocess.check_output([
+        'curl',
+        '--compressed',
+        '-H', f'Authorization: Bearer {api_key}',
+        f'{api}/problem?problem_id={id}'
+    ])
     time.sleep(1)
     res_js = json.loads(res.decode('utf-8'))
     assert('Success' in res_js)
     return json.loads(res_js['Success'])
 
 
-def get_prob_path(id: int) -> str:
-    path = f'問/{id}.problem'
+def update_username_request(username: str) -> None:
+    data = json.dumps({ 'username': username })
+    res = subprocess.check_output([
+        'curl',
+        '--compressed',
+        '-H', f'Authorization: Bearer {api_key}',
+        f'{api}/user/update_username',
+        '--json', data
+    ])
+    time.sleep(1)
+    print(res)
+    res_js = json.loads(res.decode('utf-8'))
+    assert('Success' in res_js)
+
+
+def get_prob_path(prob_id: int) -> str:
+    return f'問/{prob_id}.problem'
 
 
 def get_sol_dir_path(prob_id: int) -> str:
-    path = f'答/{prob_id}'
-    assert(os.path.exists(path))
-    return path
+    return f'答/{prob_id}'
 
 
 def download_and_save_problem(id: int):
@@ -52,6 +66,9 @@ def download_and_save_problem(id: int):
     with io.open(fname, 'w') as f:
         f.write(json.dumps(js))
         print(f'Saved to {fname}')
+    sol_dir = get_sol_dir_path(id)
+    if not os.path.exists(sol_dir):
+        os.mkdir(sol_dir)
 
 
 def get_prob(id: int) -> dict:
@@ -96,6 +113,10 @@ if __name__ == '__main__':
     if cmd == 'print_prob_stats':
         for pid in all_prob_ids():
             print_prob_stats(pid)
+        exit(0)
+
+    if cmd == 'update_username':
+        update_username_request("WILD BASHKORT MAGES")
         exit(0)
 
     print(f'invalid command: {cmd}')
