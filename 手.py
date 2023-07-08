@@ -99,24 +99,27 @@ def get_sol(prob_id: int, tag: str) -> dict:
 
 
 def get_score(prob_id: int, sol_tag: str) -> float:
-    prob_path = get_prob_path(prob_id)
-    sol_dir = get_sol_dir_path(prob_id)
-    sol_path = f'{sol_dir}/{sol_tag}.solution'
-    sys.stdout.flush()
-    try:
-        sol = subprocess.check_output([
-            '脳/脳',
-            '-pp', prob_path,
-            '-score', sol_path,
-        ])
-        return float(sol.decode())
-    except subprocess.CalledProcessError as ex: # error code <> 0
-        print('-------- ERROR --------')
-        print(ex)
-        sys.stdout.flush()
-        return 0
+    sol = get_sol(prob_id, sol_tag)
+    return sol['score']
+    # prob_path = get_prob_path(prob_id)
+    # sol_dir = get_sol_dir_path(prob_id)
+    # sol_path = f'{sol_dir}/{sol_tag}.solution'
+    # sys.stdout.flush()
+    # try:
+    #     sol = subprocess.check_output([
+    #         '脳/脳',
+    #         '-pp', prob_path,
+    #         '-score', sol_path,
+    #     ])
+    #     return float(sol.decode())
+    # except subprocess.CalledProcessError as ex: # error code <> 0
+    #     print('-------- ERROR --------')
+    #     print(ex)
+    #     sys.stdout.flush()
+    #     return 0
 
 
+# unused
 def get_score_from_str(prob_id: int, sol_str: str) -> float:
     prob_path = get_prob_path(prob_id)
     sys.stdout.flush()
@@ -237,12 +240,12 @@ def run_solver(solver_id: str, solver_args: str, prob_id: int) -> str | None:
         return None
 
 
-def save_sol(solver_id: str, prob_id: int, sol_tag: str, sol_str: str) -> None:
+def save_sol(solver_id: str, prob_id: int, sol_tag: str, sol: dict) -> None:
     print(f'saving {solver_id}({prob_id}) as {sol_tag}')
     sol_dir = get_sol_dir_path(prob_id)
     sol_path = f'{sol_dir}/{sol_tag}.solution'
     with io.open(sol_path, 'wb') as h:
-        h.write(sol_str.encode())
+        h.write(json.dumps(sol).encode())
 
 
 def solve(solver_id: str, solver_args: str, sol_tag: str, prob_id: int) -> None:
@@ -250,9 +253,10 @@ def solve(solver_id: str, solver_args: str, sol_tag: str, prob_id: int) -> None:
     if sol_str is None:
         print(f'{solver_id}({prob_id}) -> ERROR')
         return
-    score = get_score_from_str(prob_id, sol_str)
+    sol = json.loads(sol_str)
+    score = sol['score']
     print(f'{solver_id}({prob_id}) -> OK ({score})')
-    save_sol(solver_id, prob_id, sol_tag, sol_str)
+    save_sol(solver_id, prob_id, sol_tag, sol)
 
 
 def parsolve(
@@ -279,9 +283,10 @@ def parsolve(
             print(f'{solver_id}({prob_id}) -> ERROR ({retcode})')
             return
         sol_str = job['process'].communicate()[0].decode()
-        score = get_score_from_str(prob_id, sol_str)
+        sol = json.loads(sol_str)
+        score = sol['score']
         print(f'{solver_id}({prob_id}) -> OK ({score})')
-        save_sol(solver_id, prob_id, sol_tag, sol_str)
+        save_sol(solver_id, prob_id, sol_tag, sol)
 
     queue = list(range(start_id, end_id+1))
     pool = [None] * job_count
@@ -382,15 +387,32 @@ def update_username_request(username: str) -> None:
     assert('Success' in res_js)
 
 
-def purge_bad_sols(prob_id: str) -> None:
-    sol_dir = get_sol_dir_path(prob_id)
-    for tag in get_sol_tags(prob_id):
-        score = get_score(prob_id, tag)
-        if score == 0:
-            print(f'bad: {prob_id}.{tag}')
-            sol_path = f'{sol_dir}/{tag}.solution'
-            # эту строку нужно раскомментировать при каждом использовании:
-            # os.remove(sol_path)
+def purge_bad_sols() -> None:
+    for prob_id in all_prob_ids():
+        sol_dir = get_sol_dir_path(prob_id)
+        for tag in get_sol_tags(prob_id):
+            score = get_score(prob_id, tag)
+            if score == 0:
+                print(f'bad: {prob_id}.{tag}')
+                sol_path = f'{sol_dir}/{tag}.solution'
+                # эту строку нужно раскомментировать при каждом использовании:
+                # os.remove(sol_path)
+
+
+def patch_scores() -> None:
+    for prob_id in all_prob_ids():
+        sol_dir = get_sol_dir_path(prob_id)
+        for sol_tag in get_sol_tags(prob_id):
+            sol = get_sol(prob_id, sol_tag)
+            if 'score' not in sol:
+                score = get_score(prob_id, sol_tag)
+                if score == 0:
+                    print(f'bad sol: {prob_id}.{sol_tag}')
+                    continue
+                print(f'adding score: {prob_id}.{sol_tag} = {score}')
+                sol['score'] = score
+                # эту строку нужно раскомментировать при каждом использовании:
+                # save_sol('patch_scores', prob_id, sol_tag, sol)
 
 
 if __name__ == '__main__':
@@ -448,8 +470,12 @@ if __name__ == '__main__':
         exit(0)
 
     if cmd == 'purge_bad_sols':
+        purge_bad_sols()
+        exit(0)
+
+    if cmd == 'patch_scores':
         for pid in all_prob_ids():
-            purge_bad_sols(pid)
+            patch_scores()
         exit(0)
 
     if cmd == 'get_scoreboard':
