@@ -69,15 +69,15 @@ coord_label = tk.Label(root)
 coord_label.place(x=0, y=0)
 
 
-score_label = tk.Label(root)
-score_label.place(x=0, y=25)
+# score_label = tk.Label(root)
+# score_label.place(x=0, y=25)
 
 
-def set_score(score) -> None:
-    if score is None:
-        score_label.config(text=f'score: -')
-    else:
-        score_label.config(text=f'score: {score}')
+# def set_score(score) -> None:
+#     if score is None:
+#         score_label.config(text=f'score: -')
+#     else:
+#         score_label.config(text=f'score: {score}')
 
 
 def tk_color_from_rgba(rgba) -> str:
@@ -250,13 +250,15 @@ canvas.bind("<Button-3>", on_click2)
 
 def update_top_label() -> None:
     p = prob
+    score = f'{sol["score"]:,}' if sol is not None else '-'
     text = (
         f'musicians: {len(p["musicians"])}, '
         f'instuments: {len(set(p["musicians"]))}, '
         f'attendees: {len(p["attendees"])}, '
         f'pillars: {len(p["pillars"])}, '
         f'room_size: {p["room_width"]}x{p["room_height"]}, '
-        f'stage_size: {p["stage_width"]}x{p["stage_height"]}'
+        f'stage_size: {p["stage_width"]}x{p["stage_height"]}, '
+        f'score: {score}'
     )
     top_label.config(text=text)
 
@@ -274,6 +276,7 @@ def switch_sol(sol_tag: str) -> None:
     sol = 手.get_sol(prob_id, sol_tag)
     draw_all()
 
+    update_top_label()
     coord_label.focus_set()
 
 
@@ -282,7 +285,6 @@ def switch_prob(prob_id: int) -> None:
 
     prob = 手.get_prob(prob_id)
     draw_all()
-    update_top_label()
 
     best_score = 手.get_best_score(prob_id)
     def f(tag):
@@ -302,6 +304,7 @@ def switch_prob(prob_id: int) -> None:
         sol_cb.current(0)
     switch_sol(sol_cb.get())
 
+    update_top_label()
     coord_label.focus_set()
 
 
