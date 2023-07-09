@@ -411,7 +411,9 @@ double get_score( const Problem & problem, const Solution & sol, bool optimistic
 	if (new_scoring) {
 		for (int i = 0; i < n; i++) {
 			double t = 1;
-			for (int j = 0; j < n; j++) if (i != j && problem.musicians[i] == problem.musicians[j]) t += 1.0 / hypot(sol.placements[i].x - sol.placements[j].x, sol.placements[i].y - sol.placements[j].y);
+			for (int j = 0; j < n; j++)
+				if (i != j && problem.musicians[i] == problem.musicians[j])
+					t += 1.0 / hypot(sol.placements[i].x - sol.placements[j].x, sol.placements[i].y - sol.placements[j].y);
 			q[i] = t;
 		}
 	} else {
@@ -826,7 +828,120 @@ Solution get_regular_two_row_border_placement(const Problem & p, int mask = 15, 
 	return res;
 }
 
+Solution get_weird_border_placement(const Problem & p, int mask = 15, double step = 11.)
+{
+	int n = (int)p.musicians.size();
+	double sx = p.stage_bottom_left[0];
+	double sy = p.stage_bottom_left[1];
+	Solution res;
 
+	//double step = 11.;
+	for (int side=0; side<4; side++)
+		if ((mask>>side)&1)
+		{
+			if (side==0 || side==1)
+			{
+				for (int i=0; i*step*2+20 <= p.stage_width; i++)
+				{
+					double x = sx + 10 + i*step*2;
+					double y = sy + (side==0 ? 10 : p.stage_height-10);
+					if (can_place( res, x, y ))
+					{
+						res.placements.push_back( { x, y } );
+						if ((int)res.placements.size() == n) return res;
+					}
+				}
+			}
+
+			if (side==2 || side==3)
+			{
+				for (int i=0; i*step*2+20 <= p.stage_height; i++)
+				{
+					double x = sx + (side==2 ? 10 : p.stage_width-10);
+					double y = sy + 10 + i*step*2;
+					if (can_place( res, x, y ))
+					{
+						res.placements.push_back( { x, y } );
+						if ((int)res.placements.size() == n) return res;
+					}
+				}
+			}
+		}
+
+	double shift = sqrt( 100. - step*step/4 )+10.0000001;
+	for (int side=0; side<4; side++)
+		if ((mask>>side)&1)
+		{
+			if (side==0 || side==1)
+			{
+				for (int i=0; i*step+20+step <= p.stage_width; i++)
+				{
+					double x = sx + 10 + step*0.5 + i*step;
+					double y = sy + (side==0 ? shift : p.stage_height-shift);
+					if (can_place( res, x, y ))
+					{
+						res.placements.push_back( { x, y } );
+						if ((int)res.placements.size() == n) return res;
+					}
+				}
+			}
+
+			if (side==2 || side==3)
+			{
+				for (int i=0; i*step+20+step <= p.stage_height; i++)
+				{
+					double x = sx + (side==2 ? shift : p.stage_width-shift);
+					double y = sy + 10 + step*0.5 + i*step;
+					if (can_place( res, x, y ))
+					{
+						res.placements.push_back( { x, y } );
+						if ((int)res.placements.size() == n) return res;
+					}
+				}
+			}
+		}
+
+	shift = 2*sqrt( 100. - step*step/4 ) + 10.0000001;
+	for (int side=0; side<4; side++)
+		if ((mask>>side)&1)
+		{
+			if (side==0 || side==1)
+			{
+				for (int i=0; i*step*2+20+step <= p.stage_width; i++)
+				{
+					double x = sx + 10 + i*step*2 + step;
+					double y = sy + (side==0 ? shift : p.stage_height-shift);
+					if (can_place( res, x, y ))
+					{
+						res.placements.push_back( { x, y } );
+						if ((int)res.placements.size() == n) return res;
+					}
+				}
+			}
+
+			if (side==2 || side==3)
+			{
+				for (int i=0; i*step*2+20+step <= p.stage_height; i++)
+				{
+					double x = sx + (side==2 ? shift : p.stage_width-shift);
+					double y = sy + 10 + i*step*2 + step;
+					if (can_place( res, x, y ))
+					{
+						res.placements.push_back( { x, y } );
+						if ((int)res.placements.size() == n) return res;
+					}
+				}
+			}
+		}
+
+	while ((int)res.placements.size() < n)
+	{
+		double x = sx + (p.stage_width-20.) * rand()/RAND_MAX + 10.;
+		double y = sy + (p.stage_height-20.) * rand()/RAND_MAX + 10.;
+		if (can_place( res, x, y )) res.placements.push_back( { x, y } );
+	}
+	return res;
+}
 
 Solution get_border_placement(const Problem & p, int mask = 15, bool project = false)
 {
@@ -1754,6 +1869,17 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 				//fprintf(stderr, "wiggle = %.0f\n", after - before);
 			}
 			s0 = wiggle_together(p, s0);
+		}
+		else if (solver == "weird") {
+			s0 = get_weird_border_placement(p, 10, 10.0 + iters*0.1); // iters % 16);
+			s0 = solve_assignment(p, s0);
+			for (int i = 0; i < 2; i++) {
+				//auto before = s0.score;
+				s0 = wiggle(p, s0);
+				s0 = solve_assignment(p, s0);
+				//auto after = s0.score;
+				//fprintf(stderr, "wiggle = %.0f\n", after - before);
+			}
 		}
 		else if (solver == "compact") {
 			if (iters >= 9) break;
