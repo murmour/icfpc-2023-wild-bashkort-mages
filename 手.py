@@ -72,6 +72,11 @@ def send_sol_request(prob_id: int, sol_tag: str) -> str:
     sol = get_sol(prob_id, sol_tag)
     if 'score' in sol:
         del sol['score']
+    prob = get_prob(prob_id)
+    nmus = len(prob['musicians'])
+    if 'volumes' not in sol:
+        sol['volumes'] = [10.0] * nmus
+
     sub = { 'problem_id': prob_id, 'contents': json.dumps(sol) }
     sub_path = 'submission.js'
     with io.open(sub_path, 'w') as f:
@@ -106,7 +111,10 @@ def get_sol(prob_id: int, tag: str) -> dict | None:
 
 def get_score(prob_id: int, sol_tag: str) -> float:
     sol = get_sol(prob_id, sol_tag)
-    return sol['score']
+    score = sol['score']
+    if 'volumes' not in sol:
+        score *= 10
+    return score
 
 
 def get_score_dynamic(prob_id: int, sol_tag: str) -> float:
