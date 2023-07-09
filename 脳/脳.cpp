@@ -1833,6 +1833,29 @@ int main(int argc, char *argv[]) {
 		fname = format("../答/%d/%s.solution", problem_id, s);
 	}
 
+	if (auto p = args.get_arg("-volumize")) {
+		Json::Value root;
+		Solution sol;
+
+		if (!readJsonFile(p, root)) { return 1; }
+		if (!deserializeJson(sol, root)) { return 2; }
+		Problem prob;
+		if (!readJsonFile(in_file.c_str(), root)) {
+			fprintf(stderr, "Invalid json 1!\n");
+			exit(1);
+		}
+		if (!deserializeJson(prob, root)) {
+			fprintf(stderr, "Invalid json 3!\n");
+			exit(1);
+		}
+		if (!is_valid(prob, sol)) {
+			fprintf(stderr, "Invalid solution!\n");
+			exit(10);
+		}
+		writeSolution(prob, sol, "");
+		return 0;
+	}
+
 	if (auto p = args.get_arg("-score")) {
 		Json::Value root;
 		Solution sol;
