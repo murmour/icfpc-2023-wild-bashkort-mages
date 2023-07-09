@@ -78,7 +78,7 @@ bool is_valid( const Problem & problem, const Solution & sol )
 	{
 		double x = sol.placements[i].x;
 		double y = sol.placements[i].y;
-		if (!(sx <= x + 10 && x + 10 <= sx+problem.stage_width && sy <= y + 10 && y + 10 <= sy+problem.stage_height))
+		if (!(sx <= x - 10 && x + 10 <= sx+problem.stage_width && sy <= y - 10 && y + 10 <= sy+problem.stage_height))
 		{
 			fprintf(stderr, "mus %d is out of stage: (%.3f, %.3f)\n", i, x, y);
 			return false;
@@ -491,6 +491,18 @@ Solution solve_assignment(const Problem &p, const Solution &places) {
     return res;
 }
 
+bool can_place( const Solution & sol, double x, double y )
+{
+	for (int j=(int)sol.placements.size()-1; j>=0; j--)
+	{
+		double dx = sol.placements[j].x - x;
+		double dy = sol.placements[j].y - y;
+		if (dx*dx + dy*dy < 100.)
+			return false;
+	}
+	return true;
+}
+
 Solution get_regular_border_placement(const Problem & p, int mask = 15)
 {
 	int n = (int)p.musicians.size();
@@ -507,18 +519,7 @@ Solution get_regular_border_placement(const Problem & p, int mask = 15)
 				{
 					double x = sx + 10 + i*10;
 					double y = sy + (side==0 ? 10 : p.stage_height-10);
-					bool flag = true;
-					for (int j=0; j<(int)res.placements.size(); j++)
-					{
-						double dx = res.placements[j].x - x;
-						double dy = res.placements[j].y - y;
-						if (dx*dx + dy*dy < 100.)
-						{
-							flag = false;
-							break;
-						}
-					}
-					if (flag)
+					if (can_place( res, x, y ))
 					{
 						res.placements.push_back( { x, y } );
 						if ((int)res.placements.size() == n) return res;
@@ -532,18 +533,7 @@ Solution get_regular_border_placement(const Problem & p, int mask = 15)
 				{
 					double x = sx + (side==2 ? 10 : p.stage_width-10);
 					double y = sy + 10 + i*10;
-					bool flag = true;
-					for (int j=0; j<(int)res.placements.size(); j++)
-					{
-						double dx = res.placements[j].x - x;
-						double dy = res.placements[j].y - y;
-						if (dx*dx + dy*dy < 100.)
-						{
-							flag = false;
-							break;
-						}
-					}
-					if (flag)
+					if (can_place( res, x, y ))
 					{
 						res.placements.push_back( { x, y } );
 						if ((int)res.placements.size() == n) return res;
@@ -553,20 +543,202 @@ Solution get_regular_border_placement(const Problem & p, int mask = 15)
 		}
 	while ((int)res.placements.size() < n)
 	{
-		double x = sx + (p.stage_width-20.) * rand()/(RAND_MAX-1) + 10.;
-		double y = sy + (p.stage_height-20.) * rand()/(RAND_MAX-1) + 10.;
-		bool flag = true;
-		for (int j=0; j<(int)res.placements.size(); j++)
+		double x = sx + (p.stage_width-20.) * rand()/RAND_MAX + 10.;
+		double y = sy + (p.stage_height-20.) * rand()/RAND_MAX + 10.;
+		if (can_place( res, x, y )) res.placements.push_back( { x, y } );
+	}
+	return res;
+}
+
+struct Att
+{
+	double dist;
+	double x, y;
+	int index;
+};
+
+bool le( const Att & a, const Att & b )
+{
+	return a.dist < b.dist;
+}
+
+Solution get_smart_regular_border_placement( const Problem & p, int mask = 15, double max_dist = 20. )
+{
+	int n = (int)p.musicians.size();
+	int m = (int)p.attendees.size();
+	double sx = p.stage_bottom_left[0];
+	double sy = p.stage_bottom_left[1];
+
+	vector< Att > att;
+	for (int i=0; i<m; i++)
+	{
+		double x = p.attendees[i].x;
+		double y = p.attendees[i].y;
+		if (sx+10 <= x && x <= sx+p.stage_width-10)
 		{
-			double dx = res.placements[j].x - x;
-			double dy = res.placements[j].y - y;
-			if (dx*dx + dy*dy < 100.)
+			double dist = min( abs( sy-y ), abs( sy+p.stage_height-y ) );
+			if (dist < max_dist) att.push_back( { dist, x, y, i } );
+		}
+		if (sy+10 <= y && y <= sy+p.stage_height-10)
+		{
+			double dist = min( abs( sx-x ), abs( sx+p.stage_width-x ) );
+			if (dist < max_dist) att.push_back( { dist, x, y, i } );
+		}
+	}
+
+	sort( att.begin(), att.end(), le );
+	Solution res;
+	double shift = 18.;
+	for (auto a : att)
+	{
+		if (sx+10 <= a.x && a.x <= sx+p.stage_width-10)
+		{
+			if (a.y <= sy)
 			{
-				flag = false;
-				break;
+				if (can_place( res, a.x, sy+shift ))
+					res.placements.push_back( {a.x, sy+shift} );
+			}
+			else
+			{
+				if (can_place( res, a.x, sy+p.stage_height-shift ))
+					res.placements.push_back( {a.x, sy+p.stage_height-shift} );
+			}
+			if (res.placements.size() == n) return res;
+		}
+		else
+		{
+			if (a.x <= sx)
+			{
+				if (can_place( res, sx+shift, a.y ))
+					res.placements.push_back( {sx+shift, a.y} );
+			}
+			else
+			{
+				if (can_place( res, sx+p.stage_width-shift, a.y ))
+					res.placements.push_back( {sx+p.stage_width-shift, a.y} );
+			}
+			if (res.placements.size() == n) return res;
+		}
+	}
+
+	for (int side=0; side<4; side++)
+		if ((mask>>side)&1)
+		{
+			if (side==0 || side==1)
+			{
+				for (int i=0; i+20 <= p.stage_width; i++)
+				{
+					double x = sx + 10 + i;
+					double y = sy + (side==0 ? 10 : p.stage_height-10);
+					if (can_place( res, x, y ))
+					{
+						res.placements.push_back( { x, y } );
+						if ((int)res.placements.size() == n) return res;
+					}
+				}
+			}
+
+			if (side==2 || side==3)
+			{
+				for (int i=0; i+20 <= p.stage_height; i++)
+				{
+					double x = sx + (side==2 ? 10 : p.stage_width-10);
+					double y = sy + 10 + i;
+					if (can_place( res, x, y ))
+					{
+						res.placements.push_back( { x, y } );
+						if ((int)res.placements.size() == n) return res;
+					}
+				}
 			}
 		}
-		if (flag) res.placements.push_back( { x, y } );
+	while ((int)res.placements.size() < n)
+	{
+		double x = sx + (p.stage_width-20.) * rand()/RAND_MAX + 10.;
+		double y = sy + (p.stage_height-20.) * rand()/RAND_MAX + 10.;
+		if (can_place( res, x, y )) res.placements.push_back( { x, y } );
+	}
+	return res;
+}
+
+Solution get_regular_two_row_border_placement(const Problem & p, int mask = 15, double step = 11.)
+{
+	int n = (int)p.musicians.size();
+	double sx = p.stage_bottom_left[0];
+	double sy = p.stage_bottom_left[1];
+	Solution res;
+
+	//double step = 11.;
+	for (int side=0; side<4; side++)
+		if ((mask>>side)&1)
+		{
+			if (side==0 || side==1)
+			{
+				for (int i=0; i*step+20 <= p.stage_width; i++)
+				{
+					double x = sx + 10 + i*step;
+					double y = sy + (side==0 ? 10 : p.stage_height-10);
+					if (can_place( res, x, y ))
+					{
+						res.placements.push_back( { x, y } );
+						if ((int)res.placements.size() == n) return res;
+					}
+				}
+			}
+
+			if (side==2 || side==3)
+			{
+				for (int i=0; i*step+20 <= p.stage_height; i++)
+				{
+					double x = sx + (side==2 ? 10 : p.stage_width-10);
+					double y = sy + 10 + i*step;
+					if (can_place( res, x, y ))
+					{
+						res.placements.push_back( { x, y } );
+						if ((int)res.placements.size() == n) return res;
+					}
+				}
+			}
+		}
+
+	double shift = sqrt( 100. - step*step/4 )+10.0000001;
+	for (int side=0; side<4; side++)
+		if ((mask>>side)&1)
+		{
+			if (side==0 || side==1)
+			{
+				for (int i=0; i*step+20+step <= p.stage_width; i++)
+				{
+					double x = sx + 10 + step*0.5 + i*step;
+					double y = sy + (side==0 ? shift : p.stage_height-shift);
+					if (can_place( res, x, y ))
+					{
+						res.placements.push_back( { x, y } );
+						if ((int)res.placements.size() == n) return res;
+					}
+				}
+			}
+
+			if (side==2 || side==3)
+			{
+				for (int i=0; i*step+20+step <= p.stage_height; i++)
+				{
+					double x = sx + (side==2 ? shift : p.stage_width-shift);
+					double y = sy + 10 + step*0.5 + i*step;
+					if (can_place( res, x, y ))
+					{
+						res.placements.push_back( { x, y } );
+						if ((int)res.placements.size() == n) return res;
+					}
+				}
+			}
+		}
+
+	while ((int)res.placements.size() < n)
+	{
+		double x = sx + (p.stage_width-20.) * rand()/RAND_MAX + 10.;
+		double y = sy + (p.stage_height-20.) * rand()/RAND_MAX + 10.;
+		if (can_place( res, x, y )) res.placements.push_back( { x, y } );
 	}
 	return res;
 }
@@ -585,20 +757,9 @@ Solution get_border_placement(const Problem & p, int mask = 15)
 			iters++;
 			if (iters > 1000)
 			{
-				double x = sx + (p.stage_width-20.) * rand()/(RAND_MAX-1) + 10.;
-				double y = sy + (p.stage_height-20.) * rand()/(RAND_MAX-1) + 10.;
-				bool flag = true;
-				for (int j=0; j<i; j++)
-				{
-					double dx = res.placements[j].x - x;
-					double dy = res.placements[j].y - y;
-					if (dx*dx + dy*dy < 100.)
-					{
-						flag = false;
-						break;
-					}
-				}
-				if (flag)
+				double x = sx + (p.stage_width-20.) * rand()/RAND_MAX + 10.;
+				double y = sy + (p.stage_height-20.) * rand()/RAND_MAX + 10.;
+				if (can_place( res, x, y ))
 				{
 					res.placements.push_back( { x, y } );
 					break;
@@ -609,27 +770,16 @@ Solution get_border_placement(const Problem & p, int mask = 15)
 			if ( ((mask >> side)&1)==0 ) continue;
 			double x, y;
 			if (side==0 || side==1)
-				x = sx + (p.stage_width-20.) * rand()/(RAND_MAX-1) + 10.;
+				x = sx + (p.stage_width-20.) * rand()/RAND_MAX + 10.;
 			else if (side==2)
 				x = sx + 10.;
 			else x = sx + p.stage_width - 10.;
 			if (side==2 || side==3)
-				y = sy + (p.stage_height-20.) * rand()/(RAND_MAX-1) + 10.;
+				y = sy + (p.stage_height-20.) * rand()/RAND_MAX + 10.;
 			else if (side==0)
 				y = sy + 10.;
 			else y = sy + p.stage_height - 10.;
-			bool flag = true;
-			for (int j=0; j<i; j++)
-			{
-				double dx = res.placements[j].x - x;
-				double dy = res.placements[j].y - y;
-				if (dx*dx + dy*dy < 100.)
-				{
-					flag = false;
-					break;
-				}
-			}
-			if (flag)
+			if (can_place( res, x, y ))
 			{
 				res.placements.push_back( { x, y } );
 				break;
@@ -654,20 +804,9 @@ Solution get_two_row_border_placement(const Problem & p, int mask = 15)
 			iters++;
 			if (iters > 1000)
 			{
-				double x = sx + (p.stage_width-20.) * rand()/(RAND_MAX-1) + 10.;
-				double y = sy + (p.stage_height-20.) * rand()/(RAND_MAX-1) + 10.;
-				bool flag = true;
-				for (int j=0; j<i; j++)
-				{
-					double dx = res.placements[j].x - x;
-					double dy = res.placements[j].y - y;
-					if (dx*dx + dy*dy < 100.)
-					{
-						flag = false;
-						break;
-					}
-				}
-				if (flag)
+				double x = sx + (p.stage_width-20.) * rand()/RAND_MAX + 10.;
+				double y = sy + (p.stage_height-20.) * rand()/RAND_MAX + 10.;
+				if (can_place( res, x, y ))
 				{
 					res.placements.push_back( { x, y } );
 					break;
@@ -678,27 +817,16 @@ Solution get_two_row_border_placement(const Problem & p, int mask = 15)
 			if ( ((mask >> side)&1)==0 ) continue;
 			double x, y;
 			if (side==0 || side==1)
-				x = sx + (p.stage_width-20.) * rand()/(RAND_MAX-1) + 10.;
+				x = sx + (p.stage_width-20.) * rand()/RAND_MAX + 10.;
 			else if (side==2)
 				x = sx + 10. + 10.*(rand()&1);
 			else x = sx + p.stage_width - 10. - 10.*(rand()&1);
 			if (side==2 || side==3)
-				y = sy + (p.stage_height-20.) * rand()/(RAND_MAX-1) + 10.;
+				y = sy + (p.stage_height-20.) * rand()/RAND_MAX + 10.;
 			else if (side==0)
 				y = sy + 10. + 10.*(rand()&1);
 			else y = sy + p.stage_height - 10. - 10.*(rand()&1);
-			bool flag = true;
-			for (int j=0; j<i; j++)
-			{
-				double dx = res.placements[j].x - x;
-				double dy = res.placements[j].y - y;
-				if (dx*dx + dy*dy < 100.)
-				{
-					flag = false;
-					break;
-				}
-			}
-			if (flag)
+			if (can_place( res, x, y ))
 			{
 				res.placements.push_back( { x, y } );
 				break;
@@ -706,6 +834,46 @@ Solution get_two_row_border_placement(const Problem & p, int mask = 15)
 		}
 	}
 	//cerr << "got border placement\n";
+	return res;
+}
+
+Solution get_star_placement(const Problem & p)
+{
+	int rays = 3;
+	int n = (int)p.musicians.size();
+	double sx = p.stage_bottom_left[0];
+	double sy = p.stage_bottom_left[1];
+	double cx = sx + (p.stage_width-20.) * rand()/RAND_MAX + 10.;
+	double cy = sy + (p.stage_height-20.) * rand()/RAND_MAX + 10.;
+	double angle = pi * rand()/RAND_MAX;
+
+	Solution res;
+	double dist = 6.;
+	while(true)
+	{
+		bool flag = false;
+		for (int i=0; i<rays; i++)
+		{
+			double x = cx + dist*sin( angle + 2*pi*i/rays );
+			double y = cy + dist*cos( angle + 2*pi*i/rays );
+			if (sx <= x - 10 && x + 10 <= sx+p.stage_width && sy <= y - 10 && y + 10 <= sy+p.stage_height)
+			{
+				flag = true;
+				res.placements.push_back( { x, y } );
+				if ((int)res.placements.size() == n)
+					return res;
+			}
+		}
+		if (!flag) break;
+		dist += 10.000001;
+	}
+
+	while ((int)res.placements.size() < n)
+	{
+		double x = sx + (p.stage_width-20.) * rand()/RAND_MAX + 10.;
+		double y = sy + (p.stage_height-20.) * rand()/RAND_MAX + 10.;
+		if (can_place( res, x, y )) res.placements.push_back( { x, y } );
+	}
 	return res;
 }
 
@@ -720,20 +888,9 @@ Solution get_random_placement(const Problem & p)
 	{
 		while(true)
 		{
-			double x = sx + (p.stage_width-20.) * rand()/(RAND_MAX-1) + 10.;
-			double y = sy + (p.stage_height-20.) * rand()/(RAND_MAX-1) + 10.;
-			bool flag = true;
-			for (int j=0; j<i; j++)
-			{
-				double dx = res.placements[j].x - x;
-				double dy = res.placements[j].y - y;
-				if (dx*dx + dy*dy < 100.)
-				{
-					flag = false;
-					break;
-				}
-			}
-			if (flag)
+			double x = sx + (p.stage_width-20.) * rand()/RAND_MAX + 10.;
+			double y = sy + (p.stage_height-20.) * rand()/RAND_MAX + 10.;
+			if (can_place( res, x, y ))
 			{
 				res.placements.push_back( { x, y } );
 				break;
@@ -1051,11 +1208,25 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
             s0 = get_border_placement(p, rand() % 16);
         else if (solver == "regular")
             s0 = get_regular_border_placement(p, rand() % 16);
+		else if (solver == "star")
+			s0 = get_star_placement(p);
 		else if (solver == "wiggle") {
 			//if (iters > 0) break;
 			//s0 = get_random_placement(p);
-			//s0 = get_border_placement(p, iters % 16);
-			s0 = get_regular_border_placement(p, iters % 16);
+			s0 = get_border_placement(p, 15);
+			//if (iters > 90) break;
+			//s0 = get_regular_two_row_border_placement(p, 15, 10.0 + iters*0.1); //iters % 16);
+			s0 = solve_assignment(p, s0);
+			for (int i = 0; i < 1; i++) {
+				//auto before = s0.score;
+				s0 = wiggle(p, s0);
+				s0 = solve_assignment(p, s0);
+				//auto after = s0.score;
+				//fprintf(stderr, "wiggle = %.0f\n", after - before);
+			}
+		}
+		else if (solver == "smart") {
+			s0 = get_smart_regular_border_placement(p, 15, iters*100); // iters % 16);
 			s0 = solve_assignment(p, s0);
 			for (int i = 0; i < wiggles; i++) {
 				//auto before = s0.score;
@@ -1126,7 +1297,20 @@ struct ArgParser {
 	}
 };
 
+void investigation()
+{
+	freopen( "output.txt", "w", stdout );
+	for (double d=1.0; d<=2.0; d+=0.01)
+	{
+		double cover = asin( 0.5/d ) / d;
+		cout << d << " " << cover << "\n";
+	}
+}
+
 int main(int argc, char *argv[]) {
+	//investigation();
+	//return 0;
+
     ArgParser args = { argc, argv };
 
     string in_file = "";
