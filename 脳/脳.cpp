@@ -1852,6 +1852,7 @@ int main(int argc, char *argv[]) {
 			fprintf(stderr, "Invalid solution!\n");
 			exit(10);
 		}
+		sol.score = get_score(prob, sol, true);
 		writeSolution(prob, sol, "");
 		return 0;
 	}
