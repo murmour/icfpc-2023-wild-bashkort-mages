@@ -561,7 +561,7 @@ Solution solve_assignment(const Problem &p, const Solution &places) {
 	if (new_scoring)
 		res.score = get_score(p, res, true);
 	else
-		res.score = -score;
+		res.score = -score * 10 /* volume */;
 	res.mask = places.mask;
 	return res;
 }
