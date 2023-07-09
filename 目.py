@@ -61,7 +61,7 @@ top_label = tk.Label(root)
 top_label.pack()
 
 
-canvas = tk.Canvas(root, width=0, height=0)
+canvas = tk.Canvas(root, width=0, height=0, cursor="crosshair")
 canvas.pack(fill=tk.BOTH, expand=tk.YES)
 
 
@@ -87,10 +87,13 @@ def tk_color_from_rgba(rgba) -> str:
 
 def project(x: float, y: float) -> tuple[float, float]:
     ch = canvas.winfo_height()
-    return (x*pixel_size, ch - (y*pixel_size))
+    xx = x*pixel_size
+    yy = ch - (y*pixel_size)
+    return (xx, yy)
 
 
 def unproject(x: float, y: float) -> tuple[float, float]:
+    # todo: handl_boxe zoom
     ch = canvas.winfo_height()
     y = ch-y
     return (x/pixel_size, y/pixel_size)
@@ -180,7 +183,8 @@ def draw_sol() -> None:
         x = p['x']
         y = p['y']
         (x0, y0) = project(x, y)
-        draw_dot(x0, y0, 'black', 'sol')
+        (r, _) = project(5, 0)
+        canvas.create_oval(x0-r, y0-r, x0+r, y0+r, tags='sol')
 
 
 def suki_to_color(suki: float) -> str:
@@ -218,12 +222,30 @@ def draw_suki() -> None:
             )
 
 
-def on_resize(event) -> None:
+def draw_all() -> None:
     draw_prob()
     draw_sol()
     draw_suki()
 
+
+def on_resize(event) -> None:
+    draw_all()
+
 canvas.bind('<Configure>', on_resize)
+
+
+def on_click1(event) -> None:
+    xx = canvas.canvasx(event.x)
+    yy = canvas.canvasy(event.y)
+    canvas.scale('all', xx, yy, 1.1, 1.1)
+
+canvas.bind("<Button-1>", on_click1)
+
+
+def on_click2(event) -> None:
+    draw_all()
+
+canvas.bind("<Button-3>", on_click2)
 
 
 def update_top_label() -> None:
@@ -304,9 +326,7 @@ switch_sol(sol_cb.get())
 def toggle_suki() -> None:
     global suki_mode
     suki_mode = not suki_mode
-    draw_prob()
-    draw_sol()
-    draw_suki()
+    draw_all()
 
 
 @key('Right')
