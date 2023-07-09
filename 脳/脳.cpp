@@ -1094,7 +1094,7 @@ Solution get_assigned_placement(const Problem &p, bool &assigned) {
 		}
 	}
 	int q = (int)res.placements.size();
-	fprintf(stderr, "q = %d, n = %d\n", q, n);
+	//fprintf(stderr, "q = %d, n = %d\n", q, n);
 	if (q > n) {
 		// use assignment to choose best positions
 		assigned = true;
