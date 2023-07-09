@@ -661,6 +661,7 @@ Solution get_smart_regular_border_placement( const Problem & p, int mask = 15, d
 		double y = sy + (p.stage_height-20.) * rand()/RAND_MAX + 10.;
 		if (can_place( res, x, y )) res.placements.push_back( { x, y } );
 	}
+	res.mask = mask;
 	return res;
 }
 
@@ -743,6 +744,7 @@ Solution get_regular_two_row_border_placement(const Problem & p, int mask = 15, 
 		double y = sy + (p.stage_height-20.) * rand()/RAND_MAX + 10.;
 		if (can_place( res, x, y )) res.placements.push_back( { x, y } );
 	}
+	res.mask = mask;
 	return res;
 }
 
