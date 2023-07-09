@@ -272,7 +272,7 @@ def switch_sol(sol_tag: str) -> None:
 
     prob_id = int(prob_cb.get())
     sol = 手.get_sol(prob_id, sol_tag)
-    draw_sol(sol)
+    draw_all()
 
     coord_label.focus_set()
 
@@ -281,8 +281,7 @@ def switch_prob(prob_id: int) -> None:
     global sol_tags, prob
 
     prob = 手.get_prob(prob_id)
-    draw_prob()
-    draw_suki()
+    draw_all()
     update_top_label()
 
     best_score = 手.get_best_score(prob_id)
