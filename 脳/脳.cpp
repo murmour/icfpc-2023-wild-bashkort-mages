@@ -26,6 +26,11 @@ struct Attendee {
 	double x;
 	double y;
 	vector<double> tastes;
+
+	double max_taste() const {
+		return *max_element(tastes.begin(), tastes.end());
+	}
+
 	FLD_BEGIN
 		FLD(x) FLD(y) FLD(tastes)
 	FLD_END
@@ -46,6 +51,46 @@ struct Problem {
 	vector<int> musicians;
 	vector<Attendee> attendees;
 	vector<Pillar> pillars;
+
+	double dist_to_stage(const Attendee &att) const {
+		double sx1 = stage_bottom_left[0] + 10;
+		double sx2 = sx1 + stage_width - 20;
+		double sy1 = stage_bottom_left[1] + 10;
+		double sy2 = sy1 + stage_height - 20;
+		if (sx1 <= att.x && att.x <= sx2)
+			return min(abs(sy1 - att.y), abs(sy2 - att.y));
+		if (sy1 <= att.y && att.y <= sy2)
+			return min(abs(sx1 - att.x), abs(sx2 - att.x));
+		return min(
+			min(hypot(sx1 - att.x, sy1 - att.y), hypot(sx2 - att.x, sy1 - att.y)),
+			min(hypot(sx1 - att.x, sy2 - att.y), hypot(sx2 - att.x, sy2 - att.y)));
+	}
+
+	Point project_to_stage(const Attendee &att) const {
+		const double R = 0.0;
+		double sx1 = stage_bottom_left[0] + 10;
+		double sx2 = sx1 + stage_width - 20;
+		double sy1 = stage_bottom_left[1] + 10;
+		double sy2 = sy1 + stage_height - 20;
+		if (sx1 <= att.x && att.x <= sx2) {
+			if (att.y < sy1) return { att.x, sy1 + R };
+			return { att.x, sy2 - R };
+		}
+		if (sy1 <= att.y && att.y <= sy2) {
+			if (att.x < sx1) return { sx1 + R, att.y };
+			return { sx2 - R, att.y };
+		}
+		if (att.x < sx1 && att.y < sy1) return { sx1 + R, sy1 + R };
+		if (att.x < sx1 && att.y > sy2) return { sx1 + R, sy2 - R };
+		if (att.x > sx2 && att.y < sy1) return { sx2 - R, sy1 + R };
+		return { sx2 - R, sy2 - R };
+	}
+
+	bool is_valid_pos(double x, double y) const {
+		return x >= stage_bottom_left[0] + 10 && y >= stage_bottom_left[1] + 10 &&
+			x <= stage_bottom_left[0] + stage_width - 10 && y <= stage_bottom_left[1] + stage_height - 10;
+	}
+
 	FLD_BEGIN
 		FLD(room_width) FLD(room_height) FLD(stage_width) FLD(stage_height) FLD(stage_bottom_left)
 		FLD(musicians) FLD(attendees) FLD(pillars)
@@ -348,6 +393,7 @@ double get_score( const Problem & problem, const Solution & sol, bool use_ceil=t
 	}
 
 	double score = 0;
+	vector<double> att_scores(m);
 
 	for (int i=0; i<n; i++)
 	{
@@ -360,12 +406,24 @@ double get_score( const Problem & problem, const Solution & sol, bool use_ceil=t
 				double dx = A.x - B.x, dy = A.y - B.y;
 				double d2 = dx*dx + dy*dy;
 				double tmp = 1'000'000 * problem.attendees[j].tastes[problem.musicians[i]];
+				double t;
 				if (use_ceil)
-					score += ceil(q[i] * ceil( tmp / d2 ));
+					t = ceil(q[i] * ceil( tmp / d2 ));
 				else
-					score += q[i] * tmp / d2;
+					t = q[i] * tmp / d2;
+				score += t;
+				att_scores[j] += t;
 			}
 	}
+	/*
+	sort(att_scores.begin(), att_scores.end());
+	reverse(att_scores.begin(), att_scores.end());
+	double tot = 0;
+	for (int i = 0; i < m && i < 50; i++) {
+		tot += att_scores[i];
+		fprintf(stderr, "%d: %.3f\n", i + 1, tot / score);
+	}
+	*/
 	return score;
 }
 
@@ -1153,6 +1211,154 @@ Solution wiggle(const Problem &p, const Solution &sol) {
 	return res;
 }
 
+vector<double> get_mus_scores( const Problem & problem, const Solution & sol )
+{
+	int n = (int)problem.musicians.size();
+	int m = (int)problem.attendees.size();
+	assert(n == (int)sol.placements.size());
+
+	//double score = 0;
+	vector<double> mus_scores(n);
+
+	for (int i=0; i<n; i++)
+	{
+		T A = T( sol.placements[i].x, sol.placements[i].y );
+		vector< int > blocked = get_blocked3( problem, sol, i );
+		for (int j=0; j<m; j++)
+			if (blocked[j]==0)
+			{
+				T B = T( problem.attendees[j].x, problem.attendees[j].y );
+				double dx = A.x - B.x, dy = A.y - B.y;
+				double d2 = dx*dx + dy*dy;
+				double tmp = 1'000'000 * problem.attendees[j].tastes[problem.musicians[i]];
+				double t = tmp / d2;
+				mus_scores[i] += t;
+			}
+	}
+	return mus_scores;
+}
+
+Solution wiggle_together(const Problem &p, const Solution &sol) {
+	if (!new_scoring) return sol;
+	auto scores = get_mus_scores(p, sol);
+	//auto visible = calc_visible(p, sol);
+
+	int n = (int)p.musicians.size();
+	//int m = (int)p.attendees.size();
+	int k = (int)p.attendees[0].tastes.size();
+	//const double eps = 1e-9;
+
+	vector<Point> targets(k);
+	vector<double> target_scores(k);
+	for (int i = 0; i < n; i++) {
+		int inst = p.musicians[i];
+		if (scores[i] > target_scores[inst]) {
+			target_scores[inst] = scores[i];
+			targets[inst] = Point(sol.placements[i].x, sol.placements[i].y);
+		}
+	}
+
+	Solution fixed;
+	vector<int> wigglable;
+	for (int i = 0; i < n; i++) 
+		if (scores[i] < 100 && target_scores[p.musicians[i]] > 0) {
+			wigglable.push_back(i);
+		} else {
+			fixed.placements.push_back(sol.placements[i]);
+		}
+	fprintf(stderr, "%d/%d wigglable\n", (int)wigglable.size(), n);
+	if (wigglable.empty()) return sol;
+
+	vector<pair<double, Point>> deltas;
+	for (int dx = -20; dx <= 20; dx++)
+		for (int dy = -20; dy <= 20; dy++) {
+			Point d(dx * 10, dy * 10);
+			deltas.push_back({d.len(), d});
+		}
+	sort(deltas.begin(), deltas.end());
+
+	Solution res = sol;
+	auto &cur = res.placements;
+	for (int mu = 0; mu < (int)wigglable.size(); mu++) {
+		int i = wigglable[mu];
+		auto tgt = targets[p.musicians[i]];
+		bool ok = false;
+		for (auto [dist, delta] : deltas) {
+			auto pos = tgt + delta;
+			if (p.is_valid_pos(pos.x, pos.y) && can_place(fixed, pos.x, pos.y)) {
+				cur[i] = {pos.x, pos.y};
+				fixed.placements.push_back(cur[i]);
+				//fprintf(stderr, "placed %d at dist %.1f\n", i, dist);
+				ok = true;
+				break;
+			}
+		}
+		if (!ok) {
+			fprintf(stderr, "wiggle_together: failed to move %d\n", i);
+			return sol;
+		}
+	}
+
+	/*
+	double step = 1000;
+	for (int big_iter = 0; big_iter < 20; big_iter++) {
+		//bool changed = false;
+		for (int iter = 0; iter < 2000; iter++) {
+			double best_delta = 0;
+			int best_idx = -1;
+			//double best_dist;
+			Placement best_pos;
+
+			for (int mu = 0; mu < (int)wigglable.size(); mu++) {
+				int i = wigglable[mu];
+				double x0 = cur[i].x;
+				double y0 = cur[i].y;
+				Point p0(x0, y0);
+				Point dir = p0.to(targets[p.musicians[i]]);
+				if (dir.len2() == 0) continue; // cannot move to ourself
+				dir = dir.normalized();
+
+				// get max distance that we can move
+				double dist = step;
+				auto line = Line::PP(p0, p0 + dir);
+				for (int j = 0; j < n; j++) if (i != j) {
+					auto h = abs(line.at({ cur[j].x, cur[j].y }));
+					if (h >= 10) continue;
+					auto v = p0.to({ cur[j].x, cur[j].y });
+					double t = v.dot(dir);
+					if (t < 0) continue;
+					double d = t - sqrt(100 - h * h);
+					dist = min(dist, d);
+				}
+				dist = max(0.0, dist - 1e-6);
+				auto tgt = p0 + dir * dist;
+				double delta = dist * target_scores[p.musicians[i]];
+				if (delta > best_delta) {
+					best_delta = delta;
+					best_idx = i;
+					best_pos = {tgt.x, tgt.y};
+				}
+			}
+			if (best_idx != -1) {
+				//changed = true;
+				//fprintf(stderr, "delta = %.3f, idx = %d, dist = %.3f, tgt = (%.3f, %.3f)\n", best_delta, best_idx, best_dist, best_pos.x, best_pos.y);
+				cur[best_idx] = best_pos;
+			} else {
+				break;
+			}
+			//if (best_dist < 0.1 * step) break;
+		}
+		//if (changed) visible = calc_visible(p, res);
+		step = step * 0.5;
+	}
+	*/
+
+
+	res.mask = sol.mask;
+	return res;
+}
+
+
 inline double score_f(double x1, double y1, double x2, double y2, double taste) {
 	double d2 = Sqr(x1 - x2) + Sqr(y1 - y2);
 	double tmp = 1'000'000 * taste;
@@ -1213,7 +1419,10 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 		if (solver == "two_row")
 			s0 = get_two_row_border_placement(p, rand()%16);
 		else if (solver == "border")
-			s0 = get_border_placement(p, rand() % 16);
+		{
+			int mask = side_mask < 0 ? iters % 16 : side_mask;
+			s0 = get_border_placement(p, mask);
+		}
 		else if (solver == "regular")
 			s0 = get_regular_border_placement(p, rand() % 16);
 		else if (solver == "star")
