@@ -75,6 +75,7 @@ def send_sol_request(prob_id: int, sol_tag: str) -> str:
     prob = get_prob(prob_id)
     nmus = len(prob['musicians'])
     if 'volumes' not in sol:
+        print(f'{prob_id}.{sol_tag} has no volumes!')
         sol['volumes'] = [10.0] * nmus
 
     sub = { 'problem_id': prob_id, 'contents': json.dumps(sol) }
@@ -113,11 +114,12 @@ def get_score(prob_id: int, sol_tag: str) -> float:
     sol = get_sol(prob_id, sol_tag)
     score = sol['score']
     if 'volumes' not in sol:
+        print(f'{prob_id}.{sol_tag} has no volumes!')
         score *= 10
     return score
 
 
-def get_score_dynamic(prob_id: int, sol_tag: str) -> float:
+def score_sol_by_tag(prob_id: int, sol_tag: str) -> float:
     prob_path = get_prob_path(prob_id)
     sol_dir = get_sol_dir_path(prob_id)
     sol_path = f'{sol_dir}/{sol_tag}.solution'
@@ -136,8 +138,7 @@ def get_score_dynamic(prob_id: int, sol_tag: str) -> float:
         return 0
 
 
-# unused
-def get_score_from_str(prob_id: int, sol_str: str) -> float:
+def score_sol(prob_id: int, sol: dict) -> float:
     prob_path = get_prob_path(prob_id)
     sys.stdout.flush()
     try:
@@ -146,9 +147,9 @@ def get_score_from_str(prob_id: int, sol_str: str) -> float:
                 '-pp', prob_path,
                 '-score', 'stdin',
             ],
-            input=sol_str.encode()
+            input=json.dumps(sol).encode()
         )
-        return float(sol.decode())
+        return float(score.decode())
     except subprocess.CalledProcessError as ex: # error code <> 0
         print('-------- ERROR --------')
         print(ex)
@@ -420,11 +421,10 @@ def purge_bad_sols() -> None:
 
 def patch_scores() -> None:
     for prob_id in all_prob_ids():
-        sol_dir = get_sol_dir_path(prob_id)
         for sol_tag in get_sol_tags(prob_id):
             sol = get_sol(prob_id, sol_tag)
             if 'score' not in sol:
-                score = get_score_dynamic(prob_id, sol_tag)
+                score = score_sol_by_tag(prob_id, sol_tag)
                 if score == 0:
                     print(f'bad sol: {prob_id}.{sol_tag}')
                     continue
@@ -447,6 +447,45 @@ def patch_problems_with_masks() -> None:
         if mask != -1:
             # эту строку нужно раскомментировать при каждом использовании:
             save_prob(prob_id, prob)
+
+
+def volumize_sol(prob_id: int, sol: dict) -> dict:
+    prob_path = get_prob_path(prob_id)
+    sys.stdout.flush()
+    try:
+        sol = subprocess.check_output([
+                '脳/脳',
+                '-pp', prob_path,
+                '-volumize', 'stdin',
+            ],
+            input=json.dumps(sol).encode()
+        )
+        return json.loads(sol.decode())
+    except subprocess.CalledProcessError as ex: # error code <> 0
+        print('-------- ERROR --------')
+        print(ex)
+        sys.stdout.flush()
+        return None
+
+
+def volumize_all_sols() -> None:
+    for prob_id in all_prob_ids():
+        for sol_tag in get_sol_tags(prob_id):
+            sol = get_sol(prob_id, sol_tag)
+            score = sol['score']
+            vol_sol = volumize_sol(prob_id, sol)
+            if vol_sol is None:
+                continue
+            vol_score = vol_sol['score']
+            if vol_score == score:
+                print(f'{prob_id}.{sol_tag}: same')
+            elif vol_score < score:
+                print(f'{prob_id}.{sol_tag}: lower!')
+            elif vol_score > score:
+                win = vol_score - score*10
+                print(f'{prob_id}.{sol_tag}: ratio: {vol_score/score}, win: {win}')
+                # эту строку нужно раскомментировать при каждом использовании:
+                # save_sol('volumize', prob_id, sol_tag, vol_sol)
 
 
 if __name__ == '__main__':
@@ -513,6 +552,10 @@ if __name__ == '__main__':
 
     if cmd == 'patch_problems_with_masks':
         patch_problems_with_masks()
+        exit(0)
+
+    if cmd == 'volumize_sols':
+        volumize_all_sols()
         exit(0)
 
     if cmd == 'get_scoreboard':
