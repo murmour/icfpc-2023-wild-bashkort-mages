@@ -66,6 +66,18 @@ struct Problem {
 			min(hypot(sx1 - att.x, sy2 - att.y), hypot(sx2 - att.x, sy2 - att.y)));
 	}
 
+	bool is_hor(double att_x, double att_y) const {
+		double sx1 = stage_bottom_left[0] + 10;
+		double sx2 = sx1 + stage_width - 20;
+		return sx1 <= att_x && att_x <= sx2;
+	}
+
+	bool is_ver(double att_x, double att_y) const {
+		double sy1 = stage_bottom_left[1] + 10;
+		double sy2 = sy1 + stage_height - 20;
+		return sy1 <= att_y && att_y <= sy2;
+	}
+
 	Point project_to_stage(const Attendee &att) const {
 		const double R = 0.0;
 		double sx1 = stage_bottom_left[0] + 10;
@@ -100,6 +112,9 @@ struct Problem {
 struct Placement {
 	double x, y;
 	FLD_BEGIN FLD(x) FLD(y) FLD_END
+	bool operator < (const Placement &other) const {
+		return make_pair(x, y) < make_pair(other.x, other.y);
+	}
 };
 
 struct Solution {
@@ -806,13 +821,37 @@ Solution get_regular_two_row_border_placement(const Problem & p, int mask = 15, 
 	return res;
 }
 
-Solution get_border_placement(const Problem & p, int mask = 15)
+
+
+Solution get_border_placement(const Problem & p, int mask = 15, bool project = false)
 {
 	int n = (int)p.musicians.size();
 	double sx = p.stage_bottom_left[0];
 	double sy = p.stage_bottom_left[1];
 	Solution res;
-	for (int i=0; i<n; i++)
+
+	vector<int> order;
+	if (project) {
+		int m = (int)p.attendees.size();
+		vector<pair<double, int>> cands;
+		for (int i = 0; i < m; i++) {
+			double score = p.attendees[i].max_taste() * (1 / Sqr(p.dist_to_stage(p.attendees[i])));
+			if (score > 0)
+				cands.push_back({-score, i});
+		}
+		sort(cands.begin(), cands.end());
+		for (auto c: cands)
+			order.push_back(c.second);
+	}
+
+	for (int i = 0; i < (int)order.size(); i++) {
+		if ((int)res.placements.size() == n) break;
+		auto pt = p.project_to_stage(p.attendees[order[i]]);
+		if (can_place(res, pt.x, pt.y)) {
+			res.placements.push_back({pt.x, pt.y});
+		}
+	}
+	for (int i= (int)res.placements.size(); i<n; i++)
 	{
 		int iters = 0;
 		while(true)
@@ -986,6 +1025,117 @@ Solution get_some_placement(const Problem &p) {
 	return Solution();
 }
 
+//vector<Point> generate_offsets(double dist, int n) {
+//}
+
+vector<Placement> generate_locations(const Problem &p, double att_x, double att_y, int n) {
+	vector<Placement> res;
+	if (p.is_hor(att_x, att_y)) {
+		double x0 = att_x;
+		double y0 = p.project_to_stage({att_x, att_y, {}}).y;
+		res.push_back({x0, y0});
+		for (int i = 1; i <= n; i++) {
+			double x = x0 - i * 10;
+			if (!p.is_valid_pos(x, y0)) break;
+			res.push_back({x, y0});
+		}
+		for (int i = 1; i <= n; i++) {
+			double x = x0 + i * 10;
+			if (!p.is_valid_pos(x, y0)) break;
+			res.push_back({x, y0});
+		}
+		return res;
+	}
+	if (p.is_ver(att_x, att_y)) {
+		double x0 = p.project_to_stage({att_x, att_y, {}}).x;
+		double y0 = att_y;
+		res.push_back({x0, y0});
+		for (int i = 1; i <= n; i++) {
+			double y = y0 - i * 10;
+			if (!p.is_valid_pos(x0, y)) break;
+			res.push_back({x0, y});
+		}
+		for (int i = 1; i <= n; i++) {
+			double y = y0 + i * 10;
+			if (!p.is_valid_pos(x0, y)) break;
+			res.push_back({x0, y});
+		}
+		return res;
+	}
+	return res;
+}
+
+static double sqdist(double x0, double y0, double x1, double y1) {
+	return Sqr(x1-x0) + Sqr(y1-y0);
+}
+
+Solution get_assigned_placement(const Problem &p, bool &assigned) {
+	vector<pair<double, Placement>> cands;
+	int m = (int)p.attendees.size();
+	int n = (int)p.musicians.size();
+	assigned = false;
+	for (int i = 0; i < m; i++) {
+		auto w = p.attendees[i].max_taste();
+		auto d = p.dist_to_stage(p.attendees[i]);
+		int cnt = int(ceil(2000 / d));
+		double x = p.attendees[i].x;
+		double y = p.attendees[i].y;
+		for (auto pt : generate_locations(p, x, y, cnt)) {
+			double score = w / sqdist(pt.x, pt.y, x, y);
+			if (score > 0)
+				cands.push_back({-score, pt});
+		}
+	}
+	sort(cands.begin(), cands.end());
+	Solution res;
+	for (auto [score, pt] : cands) {
+		if (can_place(res, pt.x, pt.y)) {
+			res.placements.push_back(pt);
+		}
+	}
+	int q = (int)res.placements.size();
+	fprintf(stderr, "q = %d, n = %d\n", q, n);
+	if (q > n) {
+		// use assignment to choose best positions
+		assigned = true;
+		vector<vector<double>> mat(n, vector<double>(q));
+		for (int i = 0; i < n; i++)
+			for (int j = 0; j < q; j++) {
+				int inst = p.musicians[i];
+				double t = 0;
+				// todo: pillars??
+				for (int k = 0; k < m; k++) {
+					double d2 = Sqr(res.placements[j].x - p.attendees[k].x) + Sqr(res.placements[j].y - p.attendees[k].y);
+					t += 1000000 * p.attendees[k].tastes[inst] / d2;
+				}
+				mat[i][j] = -t;
+			}
+		auto ass = get_optimal_assignment(mat);
+		//fprintf(stderr, "stage 1\n");
+		vector<Placement> chosen;
+		for (auto idx : ass)
+			chosen.push_back(res.placements[idx]);
+		res.placements = chosen;
+		//fprintf(stderr, "stage 2\n");
+	} else {
+		// add some random points
+		for (int i=q; i<n; i++)
+		{
+			while(true)
+			{
+				double x = p.stage_bottom_left[0] + (p.stage_width-20.) * rand()/RAND_MAX + 10.;
+				double y = p.stage_bottom_left[1] + (p.stage_height-20.) * rand()/RAND_MAX + 10.;
+				if (can_place( res, x, y ))
+				{
+					res.placements.push_back( { x, y } );
+					break;
+				}
+			}
+		}
+	}
+	return res;
+}
+
 Solution get_compact_placement(const Problem &p, int xmode = 0, int ymode = 0) {
 	int n = (int)p.musicians.size();
 	int k = (int)ceil(sqrt(n));
@@ -1004,10 +1154,6 @@ Solution get_compact_placement(const Problem &p, int xmode = 0, int ymode = 0) {
 			res.placements.push_back({x, y});
 		}
 	return res;
-}
-
-static double sqdist(double x0, double y0, double x1, double y1) {
-	return Sqr(x1-x0) + Sqr(y1-y0);
 }
 
 // unfinished
@@ -1411,7 +1557,8 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 	int iters = 0;
 	int start_time = clock();
 	Solution best_solution;
-	while(true)
+	bool stop = false;
+	while(!stop)
 	{
 		int cur_time = clock();
 		if (cur_time - start_time > timeout*CLOCKS_PER_SEC) break;
@@ -1470,6 +1617,13 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 				s0 = solve_assignment(p, s0);
 				s0 = wiggle(p, s0);
 			}
+		}
+		else if (solver == "assign") {
+			bool assigned = false;
+			s0 = get_assigned_placement(p, /* out */ assigned);
+			if (assigned) stop = true;
+			s0 = solve_assignment(p, s0);
+			s0 = wiggle(p, s0);
 		}
 		else if (solver == "stats") {
 			print_stats(p);
