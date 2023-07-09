@@ -591,6 +591,7 @@ Solution get_smart_regular_border_placement( const Problem & p, int mask = 15, d
 
 	sort( att.begin(), att.end(), le );
 	Solution res;
+	res.mask = mask;
 	double shift = 18.;
 	for (auto a : att)
 	{
@@ -661,7 +662,6 @@ Solution get_smart_regular_border_placement( const Problem & p, int mask = 15, d
 		double y = sy + (p.stage_height-20.) * rand()/RAND_MAX + 10.;
 		if (can_place( res, x, y )) res.placements.push_back( { x, y } );
 	}
-	res.mask = mask;
 	return res;
 }
 
