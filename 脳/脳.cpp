@@ -119,9 +119,10 @@ struct Placement {
 
 struct Solution {
 	vector<Placement> placements;
+	vector<double> volumes;
 	double score = -1;
 	int mask = -1;
-	FLD_BEGIN FLD(placements) FLD(score, -1) FLD(mask, -1) FLD_END
+	FLD_BEGIN FLD(placements) FLD(score, -1) FLD(mask, -1) FLD(volumes, Json::Value(Json::arrayValue)) FLD_END
 };
 
 struct T
@@ -390,11 +391,15 @@ vector< int > get_blocked3( const Problem & problem, const Solution & sol, int m
 	return res;
 }
 
-double get_score( const Problem & problem, const Solution & sol, bool use_ceil=true )
+double get_score( const Problem & problem, const Solution & sol, bool optimistic)
 {
 	int n = (int)problem.musicians.size();
 	int m = (int)problem.attendees.size();
 	assert(n == (int)sol.placements.size());
+	auto volumes = sol.volumes;
+	if (volumes.empty())
+		volumes = vector<double>(n, 10.0);
+	assert(n == (int)volumes.size());
 
 	auto q = vector<double>(n);
 	if (new_scoring) {
@@ -406,6 +411,7 @@ double get_score( const Problem & problem, const Solution & sol, bool use_ceil=t
 	} else {
 		for (int i = 0; i < n; i++) q[i] = 1.0;
 	}
+	for (int i = 0; i < n; i++) q[i] *= volumes[i];
 
 	double score = 0;
 	vector<double> att_scores(m);
@@ -414,6 +420,7 @@ double get_score( const Problem & problem, const Solution & sol, bool use_ceil=t
 	{
 		T A = T( sol.placements[i].x, sol.placements[i].y );
 		vector< int > blocked = get_blocked3( problem, sol, i );
+		double m_score = 0;
 		for (int j=0; j<m; j++)
 			if (blocked[j]==0)
 			{
@@ -422,23 +429,13 @@ double get_score( const Problem & problem, const Solution & sol, bool use_ceil=t
 				double d2 = dx*dx + dy*dy;
 				double tmp = 1'000'000 * problem.attendees[j].tastes[problem.musicians[i]];
 				double t;
-				if (use_ceil)
-					t = ceil(q[i] * ceil( tmp / d2 ));
-				else
-					t = q[i] * tmp / d2;
-				score += t;
+				t = ceil(q[i] * ceil( tmp / d2 ));
+				m_score += t;
 				att_scores[j] += t;
 			}
+		if (m_score > 0 || !optimistic)
+			score += m_score;
 	}
-	/*
-	sort(att_scores.begin(), att_scores.end());
-	reverse(att_scores.begin(), att_scores.end());
-	double tot = 0;
-	for (int i = 0; i < m && i < 50; i++) {
-		tot += att_scores[i];
-		fprintf(stderr, "%d: %.3f\n", i + 1, tot / score);
-	}
-	*/
 	return score;
 }
 
@@ -550,6 +547,8 @@ Solution solve_assignment(const Problem &p, const Solution &places) {
 				double d2 = Sqr(places.placements[j].x - p.attendees[k].x) + Sqr(places.placements[j].y - p.attendees[k].y);
 				t += ceil(1000000 * p.attendees[k].tastes[inst] / d2);
 			}
+			// we can mute this guy if he's bad
+			t = max(t, 0.0);
 			mat[i][j] = -t;
 		}
 	auto ass = get_optimal_assignment(mat);
@@ -560,7 +559,7 @@ Solution solve_assignment(const Problem &p, const Solution &places) {
 		score += mat[i][ass[i]];
 	}
 	if (new_scoring)
-		res.score = get_score(p, res);
+		res.score = get_score(p, res, true);
 	else
 		res.score = -score;
 	res.mask = places.mask;
@@ -1327,8 +1326,15 @@ Solution get_normal_placement(const Problem &p) {
 	return res;
 }
 
-void writeSolution(const Solution &sol, string fname) {
+vector<double> get_mus_scores( const Problem & problem, const Solution & sol );
+
+void writeSolution(const Problem &p, const Solution &sol_orig, string fname) {
 	//auto f = fopen(format("../答/%d/%s.solution", problem_id, tag).c_str(), "wt");
+	Solution sol = sol_orig;
+	if (sol.volumes.empty()) {
+		for (double x : get_mus_scores(p, sol))
+			sol.volumes.push_back(x > 0 ? 10.0 : 0.0);
+	}
 	if (!fname.empty()) {
 		auto f = fopen(fname.c_str(), "wt");
 		if (!f) exit(13);
@@ -1491,7 +1497,7 @@ Solution wiggle_together(const Problem &p, const Solution &sol) {
 
 	Solution fixed;
 	vector<int> wigglable;
-	for (int i = 0; i < n; i++) 
+	for (int i = 0; i < n; i++)
 		if (scores[i] < 100 && target_scores[p.musicians[i]] > 0) {
 			wigglable.push_back(i);
 		} else {
@@ -1743,7 +1749,7 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 			best_score = s.score;
 			best_solution = s;
 			fprintf(stderr, "p%d: iters: %d score: %.3lf\n", problem_id, iters, s.score);
-			if (!fname.empty()) writeSolution(s, fname);
+			if (!fname.empty()) writeSolution(p, s, fname);
 			//double my_score = get_score(p,s);
 			//printf("my score %.3lf\n", my_score);
 		}
@@ -1751,7 +1757,7 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 	if (best_solution.placements.empty()) {
 		exit(11);
 	}
-	writeSolution(best_solution, fname);
+	writeSolution(p, best_solution, fname);
 }
 
 struct ArgParser {
@@ -1846,7 +1852,7 @@ int main(int argc, char *argv[]) {
 			fprintf(stderr, "Invalid solution!\n");
 			exit(10);
 		}
-		double score = get_score(prob, sol);
+		double score = get_score(prob, sol, false);
 		printf("%.3lf", score);
 		return 0;
 	}
