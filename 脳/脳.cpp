@@ -1546,7 +1546,7 @@ Solution wiggle_together(const Problem &p, const Solution &sol) {
 		} else {
 			fixed.placements.push_back(sol.placements[i]);
 		}
-	fprintf(stderr, "%d/%d wigglable\n", (int)wigglable.size(), n);
+	//fprintf(stderr, "%d/%d wigglable\n", (int)wigglable.size(), n);
 	if (wigglable.empty()) return sol;
 
 	vector<pair<double, Point>> deltas;
@@ -1687,6 +1687,22 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 
 	fprintf(stderr, "input %s, solver %s, %d musicians, %d attendees, %.0lf x %.0lf\n", infile.c_str(), solver.c_str(), (int)p.musicians.size(), (int)p.attendees.size(), p.room_width, p.room_height );
 
+
+	if (false) {
+		int idx = timeout;
+		int m = (int)p.attendees.size();
+		double y = p.stage_bottom_left[1] + 10;
+		for (double x = p.stage_bottom_left[0] + 10; x <= p.stage_bottom_left[0] + p.stage_width - 10; x += 1) {
+			double inst = p.musicians[idx];
+			double score = 0;
+			for (int i = 0; i < m; i++)
+				score += ceil(1000000 * p.attendees[i].tastes[inst] / sqdist(x, y, p.attendees[i].x, p.attendees[i].y));
+			fprintf(stderr, "%.0f, ", score);
+		}
+		return;
+	}
+
+
 	double best_score = 0.;
 	int iters = 0;
 	int start_time = clock();
@@ -1765,7 +1781,13 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 			bool assigned = false;
 			s0 = get_assigned_placement(p, /* out */ assigned, true, iters & 1, iters & 2, iters & 4);
 			if (assigned && iters >= 7) stop = true;
-			// s0 = solve_assignment(p, s0);
+			s0 = solve_assignment(p, s0);
+			double before = s0.score;
+			auto s1 = wiggle_together(p, s0);
+			double after = get_score(p, s0, true);
+			if (after > before)
+				s0 = s1;
+			//fprintf(stderr, "wiggle delta = %.0f\n", after - before);
 			// no wiggle!
 		}
 		else if (solver == "stats") {
