@@ -44,22 +44,26 @@ def get_prob_request(prob_id: int) -> dict:
     return json.loads(res_js['Success'])
 
 
-def download_and_save_problem(prob_id: int):
-    print(f'Downloading problem {prob_id}...')
-    js = get_prob_request(prob_id)
-    fname = get_prob_path(prob_id)
-    with io.open(fname, 'w') as f:
-        f.write(json.dumps(js))
-        print(f'Saved to {fname}')
-    sol_dir = get_sol_dir_path(prob_id)
-    if not os.path.exists(sol_dir):
-        os.mkdir(sol_dir)
-
-
 def get_prob(prob_id: int) -> dict:
     fname = get_prob_path(prob_id)
     with io.open(fname, 'r') as h:
         return json.loads(h.read())
+
+
+def save_prob(prob_id: int, prob: dict) -> None:
+    fname = get_prob_path(prob_id)
+    with io.open(fname, 'w') as f:
+        f.write(json.dumps(prob))
+
+
+def download_and_save_prob(prob_id: int) -> None:
+    print(f'Downloading problem {prob_id}...')
+    prob = get_prob_request(prob_id)
+    save_prob(prob_id, prob)
+    print(f'Saved {prob_id}')
+    sol_dir = get_sol_dir_path(prob_id)
+    if not os.path.exists(sol_dir):
+        os.mkdir(sol_dir)
 
 
 # Make a submission. Returns a submission ID.
@@ -91,9 +95,11 @@ def get_sol_tags(prob_id: int) -> list:
     return tags
 
 
-def get_sol(prob_id: int, tag: str) -> dict:
+def get_sol(prob_id: int, tag: str) -> dict | None:
     sol_dir = get_sol_dir_path(prob_id)
     fname = f'{sol_dir}/{tag}.solution'
+    if not os.path.exists(fname):
+        return None
     with io.open(fname, 'r') as h:
         return json.loads(h.read())
 
@@ -220,12 +226,22 @@ def print_sol_stats(prob_id: int) -> dict:
 
 def get_solver_cmd(solver_id: str, solver_args: str, prob_id: int) -> list[str]:
     prob_path = get_prob_path(prob_id)
+
+    # problem has mask?
+    prob = get_prob(prob_id)
+    mask = None
+    if 'mask' in prob:
+        mask = prob['mask']
+
     print(f'{solver_id}({prob_id})...')
     cmd = ['脳/脳']
     cmd += ['-s', solver_id]
     cmd += ['-pp', prob_path]
     if solver_args != '':
         cmd += solver_args.split(' ')
+    if mask is not None:
+        cmd += ['-mask', str(mask)]
+
     return cmd
 
 
@@ -410,6 +426,21 @@ def patch_scores() -> None:
                 # save_sol('patch_scores', prob_id, sol_tag, sol)
 
 
+def patch_problems_with_masks() -> None:
+    for prob_id in all_prob_ids():
+        sol = get_sol(prob_id, 'smart_1000_probe_c')
+        if sol is None:
+            print(f'{prob_id}: -')
+            continue
+        mask = sol['mask']
+        prob = get_prob(prob_id)
+        prob['mask'] = mask
+        print(f'{prob_id}: {mask}')
+        if mask != -1:
+            # эту строку нужно раскомментировать при каждом использовании:
+            save_prob(prob_id, prob)
+
+
 if __name__ == '__main__':
     cmd = sys.argv[1]
 
@@ -435,7 +466,7 @@ if __name__ == '__main__':
 
     if cmd == 'download_probs':
         for pid in all_prob_ids():
-            download_and_save_problem(pid)
+            download_and_save_prob(pid)
         exit(0)
 
     if cmd == 'get_prob_stats':
@@ -470,6 +501,10 @@ if __name__ == '__main__':
 
     if cmd == 'patch_scores':
         patch_scores()
+        exit(0)
+
+    if cmd == 'patch_problems_with_masks':
+        patch_problems_with_masks()
         exit(0)
 
     if cmd == 'get_scoreboard':
