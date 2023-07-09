@@ -19,15 +19,16 @@ template<typename T> T Sqr(const T &x) { return x * x; }
 using namespace std;
 
 int problem_id = -1;
+int side_mask = -1;
 bool new_scoring = false;
 
 struct Attendee {
-    double x;
-    double y;
-    vector<double> tastes;
-    FLD_BEGIN
-        FLD(x) FLD(y) FLD(tastes)
-    FLD_END
+	double x;
+	double y;
+	vector<double> tastes;
+	FLD_BEGIN
+		FLD(x) FLD(y) FLD(tastes)
+	FLD_END
 };
 
 struct Pillar {
@@ -37,29 +38,30 @@ struct Pillar {
 };
 
 struct Problem {
-    double room_width;
-    double room_height;
-    double stage_width;
-    double stage_height;
-    array<double, 2> stage_bottom_left;
-    vector<int> musicians;
-    vector<Attendee> attendees;
+	double room_width;
+	double room_height;
+	double stage_width;
+	double stage_height;
+	array<double, 2> stage_bottom_left;
+	vector<int> musicians;
+	vector<Attendee> attendees;
 	vector<Pillar> pillars;
-    FLD_BEGIN
-        FLD(room_width) FLD(room_height) FLD(stage_width) FLD(stage_height) FLD(stage_bottom_left)
-        FLD(musicians) FLD(attendees) FLD(pillars)
-    FLD_END
+	FLD_BEGIN
+		FLD(room_width) FLD(room_height) FLD(stage_width) FLD(stage_height) FLD(stage_bottom_left)
+		FLD(musicians) FLD(attendees) FLD(pillars)
+	FLD_END
 };
 
 struct Placement {
-    double x, y;
-    FLD_BEGIN FLD(x) FLD(y) FLD_END
+	double x, y;
+	FLD_BEGIN FLD(x) FLD(y) FLD_END
 };
 
 struct Solution {
-    vector<Placement> placements;
+	vector<Placement> placements;
 	double score = -1;
-    FLD_BEGIN FLD(placements) FLD(score, -1) FLD_END
+	int mask = -1;
+	FLD_BEGIN FLD(placements) FLD(score, -1) FLD(mask, -1) FLD_END
 };
 
 struct T
@@ -332,7 +334,7 @@ double get_score( const Problem & problem, const Solution & sol, bool use_ceil=t
 {
 	int n = (int)problem.musicians.size();
 	int m = (int)problem.attendees.size();
-    assert(n == (int)sol.placements.size());
+	assert(n == (int)sol.placements.size());
 
 	auto q = vector<double>(n);
 	if (new_scoring) {
@@ -358,10 +360,10 @@ double get_score( const Problem & problem, const Solution & sol, bool use_ceil=t
 				double dx = A.x - B.x, dy = A.y - B.y;
 				double d2 = dx*dx + dy*dy;
 				double tmp = 1'000'000 * problem.attendees[j].tastes[problem.musicians[i]];
-                if (use_ceil)
-				    score += ceil(q[i] * ceil( tmp / d2 ));
-                else
-                    score += q[i] * tmp / d2;
+				if (use_ceil)
+					score += ceil(q[i] * ceil( tmp / d2 ));
+				else
+					score += q[i] * tmp / d2;
 			}
 	}
 	return score;
@@ -373,7 +375,7 @@ vector<vector<int>> calc_visible(const Problem &p, const Solution &places) {
 	vector<vector<int>> res;
 	int n = (int)p.musicians.size();
 	int m = (int)p.attendees.size();
-    for (int i=0; i<n; i++)
+	for (int i=0; i<n; i++)
 	{
 		vector< int > tmp = get_blocked3( p, places, i );
 		//vector< int > tmp2 = get_blocked_stupid( p, places, i );
@@ -390,70 +392,70 @@ typedef double Weight;
 
 vector<int> get_optimal_assignment(const vector<vector<Weight> > &a)
 {
-    const Weight inf = 1e30;
-    int n = (int)a.size();
-    if (n == 0) return vector<int>();
-    int m = (int)a[0].size();
-    if (n > m)
-    {
-        vector<vector<Weight> > at(m, vector<Weight>(n));
-        for (int i = 0; i < n; i++)
-            for (int j = 0; j < m; j++)
-                at[j][i] = a[i][j];
-        auto rest = get_optimal_assignment(at);
-        vector<int> res(n, -1);
-        for (int i = 0; i < m; i++) res[rest[i]] = i;
-        return res;
-    }
-    vector<int> p(m + 1), way(m + 1);
-    vector<Weight> u(n + 1), v(m + 1);
-    vector<Weight> minv(m + 1);
-    vector<char> used(m + 1);
-    for (int i = 1; i <= n; ++i) {
-        p[0] = i;
-        int j0 = 0;
-        fill(minv.begin(), minv.end(), inf);
-        fill(used.begin(), used.end(), false);
-        do
-        {
-            used[j0] = true;
-            int i0 = p[j0], j1 = 0;
-            Weight delta = inf;
-            for (int j = 1; j <= m; ++j)
-                if (!used[j])
-                {
-                    Weight cur = (i0 ? a[i0 - 1][j - 1] : 0) - u[i0] - v[j];
-                    if (cur < minv[j])
-                        minv[j] = cur, way[j] = j0;
-                    if (minv[j] < delta)
-                        delta = minv[j], j1 = j;
-                }
-            for (int j = 0; j <= m; ++j)
-                if (used[j])
-                    u[p[j]] += delta, v[j] -= delta;
-                else
-                    minv[j] -= delta;
-            j0 = j1;
-        } while (p[j0] != 0);
-        do
-        {
-            int j1 = way[j0];
-            p[j0] = p[j1];
-            j0 = j1;
-        } while (j0);
-    }
-    vector<int> res(n, -1);
-    for (int j = 1; j <= m; ++j)
-        if (p[j] > 0)
-            res[p[j] - 1] = j - 1;
-    return res;
+	const Weight inf = 1e30;
+	int n = (int)a.size();
+	if (n == 0) return vector<int>();
+	int m = (int)a[0].size();
+	if (n > m)
+	{
+		vector<vector<Weight> > at(m, vector<Weight>(n));
+		for (int i = 0; i < n; i++)
+			for (int j = 0; j < m; j++)
+				at[j][i] = a[i][j];
+		auto rest = get_optimal_assignment(at);
+		vector<int> res(n, -1);
+		for (int i = 0; i < m; i++) res[rest[i]] = i;
+		return res;
+	}
+	vector<int> p(m + 1), way(m + 1);
+	vector<Weight> u(n + 1), v(m + 1);
+	vector<Weight> minv(m + 1);
+	vector<char> used(m + 1);
+	for (int i = 1; i <= n; ++i) {
+		p[0] = i;
+		int j0 = 0;
+		fill(minv.begin(), minv.end(), inf);
+		fill(used.begin(), used.end(), false);
+		do
+		{
+			used[j0] = true;
+			int i0 = p[j0], j1 = 0;
+			Weight delta = inf;
+			for (int j = 1; j <= m; ++j)
+				if (!used[j])
+				{
+					Weight cur = (i0 ? a[i0 - 1][j - 1] : 0) - u[i0] - v[j];
+					if (cur < minv[j])
+						minv[j] = cur, way[j] = j0;
+					if (minv[j] < delta)
+						delta = minv[j], j1 = j;
+				}
+			for (int j = 0; j <= m; ++j)
+				if (used[j])
+					u[p[j]] += delta, v[j] -= delta;
+				else
+					minv[j] -= delta;
+			j0 = j1;
+		} while (p[j0] != 0);
+		do
+		{
+			int j1 = way[j0];
+			p[j0] = p[j1];
+			j0 = j1;
+		} while (j0);
+	}
+	vector<int> res(n, -1);
+	for (int j = 1; j <= m; ++j)
+		if (p[j] > 0)
+			res[p[j] - 1] = j - 1;
+	return res;
 }
 
 Solution solve_assignment(const Problem &p, const Solution &places) {
 	//cerr << "solve assignment\n";
-    auto visible = calc_visible(p, places);
-    int n = (int)p.musicians.size();
-    int m = (int)p.attendees.size();
+	auto visible = calc_visible(p, places);
+	int n = (int)p.musicians.size();
+	int m = (int)p.attendees.size();
 	/*
 	auto q = vector<double>(n);
 	if (new_scoring) {
@@ -466,29 +468,30 @@ Solution solve_assignment(const Problem &p, const Solution &places) {
 		for (int i = 0; i < n; i++) q[i] = 1.0;
 	}
 	*/
-    vector<vector<double>> mat(n, vector<double>(n));
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++) {
-            int inst = p.musicians[i];
-            double t = 0;
-            for (int k = 0; k < m; k++) if (visible[j][k]) {
-                double d2 = Sqr(places.placements[j].x - p.attendees[k].x) + Sqr(places.placements[j].y - p.attendees[k].y);
-                t += ceil(1000000 * p.attendees[k].tastes[inst] / d2);
-            }
-            mat[i][j] = -t;
-        }
-    auto ass = get_optimal_assignment(mat);
-    Solution res;
-    double score = 0;
-    for (int i = 0; i < n; i++) {
-        res.placements.push_back(places.placements[ass[i]]);
-        score += mat[i][ass[i]];
-    }
+	vector<vector<double>> mat(n, vector<double>(n));
+	for (int i = 0; i < n; i++)
+		for (int j = 0; j < n; j++) {
+			int inst = p.musicians[i];
+			double t = 0;
+			for (int k = 0; k < m; k++) if (visible[j][k]) {
+				double d2 = Sqr(places.placements[j].x - p.attendees[k].x) + Sqr(places.placements[j].y - p.attendees[k].y);
+				t += ceil(1000000 * p.attendees[k].tastes[inst] / d2);
+			}
+			mat[i][j] = -t;
+		}
+	auto ass = get_optimal_assignment(mat);
+	Solution res;
+	double score = 0;
+	for (int i = 0; i < n; i++) {
+		res.placements.push_back(places.placements[ass[i]]);
+		score += mat[i][ass[i]];
+	}
 	if (new_scoring)
 		res.score = get_score(p, res);
 	else
 		res.score = -score;
-    return res;
+	res.mask = places.mask;
+	return res;
 }
 
 bool can_place( const Solution & sol, double x, double y )
@@ -603,7 +606,7 @@ Solution get_smart_regular_border_placement( const Problem & p, int mask = 15, d
 				if (can_place( res, a.x, sy+p.stage_height-shift ))
 					res.placements.push_back( {a.x, sy+p.stage_height-shift} );
 			}
-			if (res.placements.size() == n) return res;
+			if ((int)res.placements.size() == n) return res;
 		}
 		else
 		{
@@ -617,7 +620,7 @@ Solution get_smart_regular_border_placement( const Problem & p, int mask = 15, d
 				if (can_place( res, sx+p.stage_width-shift, a.y ))
 					res.placements.push_back( {sx+p.stage_width-shift, a.y} );
 			}
-			if (res.placements.size() == n) return res;
+			if ((int)res.placements.size() == n) return res;
 		}
 	}
 
@@ -787,6 +790,7 @@ Solution get_border_placement(const Problem & p, int mask = 15)
 		}
 	}
 	//cerr << "got border placement\n";
+	res.mask = mask;
 	return res;
 }
 
@@ -834,6 +838,7 @@ Solution get_two_row_border_placement(const Problem & p, int mask = 15)
 		}
 	}
 	//cerr << "got border placement\n";
+	res.mask = mask;
 	return res;
 }
 
@@ -902,23 +907,23 @@ Solution get_random_placement(const Problem & p)
 
 Solution get_some_placement(const Problem &p) {
 	cerr << "get some placement\n";
-    int n = (int)p.musicians.size();
+	int n = (int)p.musicians.size();
 	double sx = p.stage_bottom_left[0];
 	double sy = p.stage_bottom_left[1];
-    for (int i = 1; i <= n; i++) { // n rows
-        int j = (n + i - 1) / i ; // n cols
-        if (10 * i + 10 > p.stage_height || 10 * j + 10 > p.stage_width) continue;
-        double dx = p.stage_width / (j + 1);
-        double dy = p.stage_height / (i + 1);
-        Solution res;
-        for (int x = 0; x < j; x++)
-            for (int y = 0; y < i; y++) {
-                if ((int)res.placements.size() == n) break;
-                res.placements.push_back({ sx + dx * (x + 1), sy + dy * (y + 1) });
-            }
-        return res;
-    }
-    return Solution();
+	for (int i = 1; i <= n; i++) { // n rows
+		int j = (n + i - 1) / i ; // n cols
+		if (10 * i + 10 > p.stage_height || 10 * j + 10 > p.stage_width) continue;
+		double dx = p.stage_width / (j + 1);
+		double dy = p.stage_height / (i + 1);
+		Solution res;
+		for (int x = 0; x < j; x++)
+			for (int y = 0; y < i; y++) {
+				if ((int)res.placements.size() == n) break;
+				res.placements.push_back({ sx + dx * (x + 1), sy + dy * (y + 1) });
+			}
+		return res;
+	}
+	return Solution();
 }
 
 Solution get_compact_placement(const Problem &p, int xmode = 0, int ymode = 0) {
@@ -942,107 +947,107 @@ Solution get_compact_placement(const Problem &p, int xmode = 0, int ymode = 0) {
 }
 
 static double sqdist(double x0, double y0, double x1, double y1) {
-    return Sqr(x1-x0) + Sqr(y1-y0);
+	return Sqr(x1-x0) + Sqr(y1-y0);
 }
 
 // unfinished
 Solution get_spiral_placement(const Problem &p, int iter) {
-    const int n = (int)p.musicians.size();
-    const double sw = p.stage_width;
-    const double sh = p.stage_height;
-    const double center_x = sw/2;
-    const double center_y = sh/2;
-    const double a = 5;
-    const double b = 5;
-    Solution res;
-    fprintf(stderr, "spiral scene: %f %f\n", sw, sh);
+	const int n = (int)p.musicians.size();
+	const double sw = p.stage_width;
+	const double sh = p.stage_height;
+	const double center_x = sw/2;
+	const double center_y = sh/2;
+	const double a = 5;
+	const double b = 5;
+	Solution res;
+	fprintf(stderr, "spiral scene: %f %f\n", sw, sh);
 
-    // first point
-    double prev_x = center_x;
-    double prev_y = center_y;
-    int pts = 1;
-    res.placements.push_back({
-        p.stage_bottom_left[0] + prev_x,
-        p.stage_bottom_left[1] + prev_y
-    });
+	// first point
+	double prev_x = center_x;
+	double prev_y = center_y;
+	int pts = 1;
+	res.placements.push_back({
+		p.stage_bottom_left[0] + prev_x,
+		p.stage_bottom_left[1] + prev_y
+	});
 
-    int i = 1;
-    while (pts < n) {
-        const double angle = 0.01 * i;
-        const double x = center_x + (a + b*angle)*cos(angle);
-        const double y = center_y + (a + b*angle)*sin(angle);
-        if (x < 10 || y < 10 || sw-x < 10 || sh-y < 10) {
-            fprintf(stderr, "hit wall: %f %f\n", x, y);
-            exit(10);
-        }
-        if (sqdist(x, y, prev_x, prev_y) > 100) {
-            fprintf(stderr, "spiral point: %f %f\n", x, y);
-            const double rx = p.stage_bottom_left[0] + x;
-            const double ry = p.stage_bottom_left[1] + y;
-            res.placements.push_back({rx, ry});
-            prev_x = x;
-            prev_y = y;
-            pts++;
-        }
-        i++;
-    }
-    return res;
+	int i = 1;
+	while (pts < n) {
+		const double angle = 0.01 * i;
+		const double x = center_x + (a + b*angle)*cos(angle);
+		const double y = center_y + (a + b*angle)*sin(angle);
+		if (x < 10 || y < 10 || sw-x < 10 || sh-y < 10) {
+			fprintf(stderr, "hit wall: %f %f\n", x, y);
+			exit(10);
+		}
+		if (sqdist(x, y, prev_x, prev_y) > 100) {
+			fprintf(stderr, "spiral point: %f %f\n", x, y);
+			const double rx = p.stage_bottom_left[0] + x;
+			const double ry = p.stage_bottom_left[1] + y;
+			res.placements.push_back({rx, ry});
+			prev_x = x;
+			prev_y = y;
+			pts++;
+		}
+		i++;
+	}
+	return res;
 }
 
 Solution get_normal_placement(const Problem &p) {
-    const int n = (int)p.musicians.size();
-    const double sx = p.stage_bottom_left[0];
-    const double sy = p.stage_bottom_left[1];
-    const double sw = p.stage_width;
-    const double sh = p.stage_height;
-    const double center_x = sx + sw/2;
-    const double center_y = sy + sh/2;
+	const int n = (int)p.musicians.size();
+	const double sx = p.stage_bottom_left[0];
+	const double sy = p.stage_bottom_left[1];
+	const double sw = p.stage_width;
+	const double sh = p.stage_height;
+	const double center_x = sx + sw/2;
+	const double center_y = sy + sh/2;
 
-    std::random_device rd {};
-    std::mt19937 gen {rd()};
-    // вместе хардкода 4 нужно как-то поумнее подбирать дисперсию
-    std::normal_distribution<double> dx {center_x, sw/4};
-    std::normal_distribution<double> dy {center_y, sh/4};
+	std::random_device rd {};
+	std::mt19937 gen {rd()};
+	// вместе хардкода 4 нужно как-то поумнее подбирать дисперсию
+	std::normal_distribution<double> dx {center_x, sw/4};
+	std::normal_distribution<double> dy {center_y, sh/4};
 
-    Solution res;
-    for (int i = 0; i < n; i++) {
-        while (1) {
-            const double x = dx(gen);
-            if (x-10 < sx || x+10 > sx+sw)
-                continue;
-            const double y = dy(gen);
-            if (y-10 < sy || y+10 > sy+sh)
-                continue;
-            bool flag = true;
-            for (int j = 0; j < i; j++) {
-                const double dx = res.placements[j].x - x;
-                const double dy = res.placements[j].y - y;
-                if (dx*dx + dy*dy < 100) {
-                    flag = false;
-                    break;
-                }
-            }
-            if (flag) {
-                res.placements.push_back({ x, y });
-                break;
-            }
-        }
-    }
-    return res;
+	Solution res;
+	for (int i = 0; i < n; i++) {
+		while (1) {
+			const double x = dx(gen);
+			if (x-10 < sx || x+10 > sx+sw)
+				continue;
+			const double y = dy(gen);
+			if (y-10 < sy || y+10 > sy+sh)
+				continue;
+			bool flag = true;
+			for (int j = 0; j < i; j++) {
+				const double dx = res.placements[j].x - x;
+				const double dy = res.placements[j].y - y;
+				if (dx*dx + dy*dy < 100) {
+					flag = false;
+					break;
+				}
+			}
+			if (flag) {
+				res.placements.push_back({ x, y });
+				break;
+			}
+		}
+	}
+	return res;
 }
 
 void writeSolution(const Solution &sol, string fname) {
-    //auto f = fopen(format("../答/%d/%s.solution", problem_id, tag).c_str(), "wt");
-    if (!fname.empty()) {
-        auto f = fopen(fname.c_str(), "wt");
-        if (!f) exit(13);
-        Json::FastWriter fw;
-        fprintf(f, "%s", fw.write(serializeJson(sol)).c_str());
-        fclose(f);
-    } else {
-        Json::FastWriter fw;
-        printf("%s", fw.write(serializeJson(sol)).c_str());
-    }
+	//auto f = fopen(format("../答/%d/%s.solution", problem_id, tag).c_str(), "wt");
+	if (!fname.empty()) {
+		auto f = fopen(fname.c_str(), "wt");
+		if (!f) exit(13);
+		Json::FastWriter fw;
+		fprintf(f, "%s", fw.write(serializeJson(sol)).c_str());
+		fclose(f);
+	} else {
+		Json::FastWriter fw;
+		printf("%s", fw.write(serializeJson(sol)).c_str());
+	}
 }
 
 inline double score_f_no_ceil(double x1, double y1, double x2, double y2, double taste) {
@@ -1052,7 +1057,7 @@ inline double score_f_no_ceil(double x1, double y1, double x2, double y2, double
 }
 
 Solution wiggle(const Problem &p, const Solution &sol) {
-    auto visible = calc_visible(p, sol);
+	auto visible = calc_visible(p, sol);
 	int n = (int)p.musicians.size();
 	int m = (int)p.attendees.size();
 	const double eps = 1e-9;
@@ -1142,6 +1147,7 @@ Solution wiggle(const Problem &p, const Solution &sol) {
 		if (changed) visible = calc_visible(p, res);
 		step = step * 0.5;
 	}
+	res.mask = sol.mask;
 	return res;
 }
 
@@ -1180,42 +1186,45 @@ vector<double> get_instrument_scores(const Problem &p) {
 }
 
 void solve(const string &infile, int timeout, int wiggles, const string &solver, const string &fname) {
-    Json::Value root, root_s;
-    Problem p;
-    if (!readJsonFile(infile.c_str(), root)) {
-        fprintf(stderr, "Invalid json 1!\n");
-        exit(1);
-    }
-    if (!deserializeJson(p, root)) {
-        fprintf(stderr, "Invalid json 3!\n");
-        exit(1);
-    }
+	Json::Value root, root_s;
+	Problem p;
+	if (!readJsonFile(infile.c_str(), root)) {
+		fprintf(stderr, "Invalid json 1!\n");
+		exit(1);
+	}
+	if (!deserializeJson(p, root)) {
+		fprintf(stderr, "Invalid json 3!\n");
+		exit(1);
+	}
 
 	fprintf(stderr, "input %s, solver %s, %d musicians, %d attendees, %.0lf x %.0lf\n", infile.c_str(), solver.c_str(), (int)p.musicians.size(), (int)p.attendees.size(), p.room_width, p.room_height );
 
 	double best_score = 0.;
 	int iters = 0;
 	int start_time = clock();
-    Solution best_solution;
+	Solution best_solution;
 	while(true)
 	{
 		int cur_time = clock();
 		if (cur_time - start_time > timeout*CLOCKS_PER_SEC) break;
-        Solution s0;
-        if (solver == "two_row")
-		    s0 = get_two_row_border_placement(p, rand()%16);
-        else if (solver == "border")
-            s0 = get_border_placement(p, rand() % 16);
-        else if (solver == "regular")
-            s0 = get_regular_border_placement(p, rand() % 16);
+		Solution s0;
+		if (solver == "two_row")
+			s0 = get_two_row_border_placement(p, rand()%16);
+		else if (solver == "border")
+			s0 = get_border_placement(p, rand() % 16);
+		else if (solver == "regular")
+			s0 = get_regular_border_placement(p, rand() % 16);
 		else if (solver == "star")
 			s0 = get_star_placement(p);
-		else if (solver == "wiggle") {
+		else if (solver == "wiggle" || solver == "wiggle_trr") {
 			//if (iters > 0) break;
 			//s0 = get_random_placement(p);
-			s0 = get_border_placement(p, 15);
+			int mask = side_mask < 0 ? iters % 16 : side_mask;
+			if (solver == "wiggle")
+				s0 = get_border_placement(p, mask);
+			else
+				s0 = get_regular_two_row_border_placement(p, mask, 10.0 + iters*0.1);
 			//if (iters > 90) break;
-			//s0 = get_regular_two_row_border_placement(p, 15, 10.0 + iters*0.1); //iters % 16);
 			s0 = solve_assignment(p, s0);
 			for (int i = 0; i < 1; i++) {
 				//auto before = s0.score;
@@ -1226,12 +1235,12 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 			}
 		}
 		else if (solver == "smart") {
-			s0 = get_smart_regular_border_placement(p, 15, iters*100); // iters % 16);
-			s0 = solve_assignment(p, s0);
+			int mask = side_mask < 0 ? iters % 16 : side_mask;
+			s0 = get_smart_regular_border_placement(p, mask, iters*100);
 			for (int i = 0; i < wiggles; i++) {
 				//auto before = s0.score;
-				s0 = wiggle(p, s0);
 				s0 = solve_assignment(p, s0);
+				s0 = wiggle(p, s0);
 				//auto after = s0.score;
 				//fprintf(stderr, "wiggle = %.0f\n", after - before);
 			}
@@ -1242,7 +1251,7 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 		}
 		else if (solver == "spiral") {
 			s0 = get_spiral_placement(p, iters);
-            if (iters > 0) break;
+			if (iters > 0) break;
 		}
 		else if (solver == "normal") {
 			s0 = get_normal_placement(p);
@@ -1255,10 +1264,10 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 			print_stats(p);
 			break;
 		}
-        else {
-            fprintf(stderr, "Invalid solver: %s\n", solver.c_str());
+		else {
+			fprintf(stderr, "Invalid solver: %s\n", solver.c_str());
 			exit(10);
-        }
+		}
 
 		if (s0.placements.empty()) {
 			exit(2);
@@ -1273,17 +1282,17 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 		if (s.score > best_score)
 		{
 			best_score = s.score;
-            best_solution = s;
+			best_solution = s;
 			fprintf(stderr, "p%d: iters: %d score: %.3lf\n", problem_id, iters, s.score);
-            if (!fname.empty()) writeSolution(s, fname);
+			if (!fname.empty()) writeSolution(s, fname);
 			//double my_score = get_score(p,s);
 			//printf("my score %.3lf\n", my_score);
 		}
 	}
-    if (best_solution.placements.empty()) {
-        exit(11);
-    }
-    writeSolution(best_solution, fname);
+	if (best_solution.placements.empty()) {
+		exit(11);
+	}
+	writeSolution(best_solution, fname);
 }
 
 struct ArgParser {
@@ -1311,16 +1320,16 @@ int main(int argc, char *argv[]) {
 	//investigation();
 	//return 0;
 
-    ArgParser args = { argc, argv };
+	ArgParser args = { argc, argv };
 
-    string in_file = "";
-    if (auto p = args.get_arg("-pp"))
-    {
-        in_file = p;
-    } else {
-        if (auto p = args.get_arg("-p"))
-            in_file = format("../問/%s.problem", p);
-    }
+	string in_file = "";
+	if (auto p = args.get_arg("-pp"))
+	{
+		in_file = p;
+	} else {
+		if (auto p = args.get_arg("-p"))
+			in_file = format("../問/%s.problem", p);
+	}
 
 	regex prob_id("/(\\d+)\\.problem");
 	smatch match;
@@ -1330,53 +1339,59 @@ int main(int argc, char *argv[]) {
 		if (problem_id >= 56) new_scoring = true;
 	}
 
-    int timeout = 120;
-    if (auto p = args.get_arg("-timeout"))
-        sscanf(p, "%d", &timeout);
+	int timeout = 120;
+	if (auto p = args.get_arg("-timeout")) {
+		sscanf(p, "%d", &timeout);
+	}
 
-    int wiggles = 0;
-    if (auto p = args.get_arg("-wiggles"))
-        sscanf(p, "%d", &wiggles);
+	int wiggles = 0;
+	if (auto p = args.get_arg("-wiggles")) {
+		sscanf(p, "%d", &wiggles);
+	}
 
-    string solver = "regular";
+	if (auto p = args.get_arg("-mask")) {
+		sscanf(p, "%d", &side_mask);
+	}
+
+	string solver = "regular";
 	if (auto s = args.get_arg("-s")) {
-        solver = s;
-    }
+		solver = s;
+	}
 
-    string fname = "";
+	string fname = "";
 	if (auto s = args.get_arg("-out")) {
-        fname = s;
-    }
+		fname = s;
+	}
 	if (auto s = args.get_arg("-tag")) {
 		fname = format("../答/%d/%s.solution", problem_id, s);
 	}
 
-    if (auto p = args.get_arg("-score")) {
-        Json::Value root;
-        Solution sol;
+	if (auto p = args.get_arg("-score")) {
+		Json::Value root;
+		Solution sol;
 
-        if (!readJsonFile(p, root)) { return 1; }
-        if (!deserializeJson(sol, root)) { return 2; }
-        Problem prob;
-        if (!readJsonFile(in_file.c_str(), root)) {
-            fprintf(stderr, "Invalid json 1!\n");
-            exit(1);
-        }
-        if (!deserializeJson(prob, root)) {
-            fprintf(stderr, "Invalid json 3!\n");
-            exit(1);
-        }
+		if (!readJsonFile(p, root)) { return 1; }
+		if (!deserializeJson(sol, root)) { return 2; }
+		Problem prob;
+		if (!readJsonFile(in_file.c_str(), root)) {
+			fprintf(stderr, "Invalid json 1!\n");
+			exit(1);
+		}
+		if (!deserializeJson(prob, root)) {
+			fprintf(stderr, "Invalid json 3!\n");
+			exit(1);
+		}
 		if (!is_valid(prob, sol)) {
 			fprintf(stderr, "Invalid solution!\n");
-            exit(10);
+			exit(10);
 		}
-        double score = get_score(prob, sol);
-        printf("%.3lf", score);
-        return 0;
-    }
+		double score = get_score(prob, sol);
+		printf("%.3lf", score);
+		return 0;
+	}
 
-    solve(in_file, timeout, wiggles, solver, fname);
+	solve(in_file, timeout, wiggles, solver, fname);
 	//for (int i=1; i<=45; i++)
 	//	solve(i);
-    return 0;
+	return 0;
 }
