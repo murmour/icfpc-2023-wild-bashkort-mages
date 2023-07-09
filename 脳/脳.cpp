@@ -1025,8 +1025,83 @@ Solution get_some_placement(const Problem &p) {
 	return Solution();
 }
 
-//vector<Point> generate_offsets(double dist, int n) {
-//}
+void calc_tangent(Point p, Point c, double R, Point &tp) {
+	double d = p.to(c).len();
+	double t = Sqr(R) / d;
+	auto v = p.to(c).normalized();
+	auto u = v.rot90();
+	double h = sqrt(R * R - t * t);
+	tp = p + v * (d - t) + u * h;
+}
+
+vector<Point> generate_offsets(double dist, int n) {
+	Point att = {0, dist};
+	Point last = {0, 0};
+	const double R = 5.003;
+	vector<Point> res;
+	res.push_back(last);
+	bool stop = false;
+	for (int i = 0; i < n; i++) {
+		if (!stop) {
+			Point tp;
+			calc_tangent(att, last, R, tp);
+			auto v = att.to(tp).normalized();
+			auto u = v.rot90();
+			Point a = tp + u * R;
+			double yshift = a.y;
+			double shift = yshift / -v.y;
+			Point tmp = a + v * shift;
+			if (tmp.x - last.x > 4 * R) {
+				stop = true;
+			} else {
+				last.x = tmp.x;
+				res.push_back(last);
+				res.push_back({-last.x, 0});
+				Point other = last - u * R + v * (sqrt(3) * R);
+				res.push_back(other);
+				res.push_back({-other.x, other.y});
+				i++;
+			}
+		}
+		if (stop) {
+			last.x += 2 * R;
+			res.push_back(last);
+			res.push_back({-last.x, 0});
+		}
+	}
+	return res;
+}
+
+vector<pair<Placement, bool>> generate_locations2(const Problem &p, double att_x, double att_y, int n) {
+	vector<pair<Placement, bool>> res;
+	if (p.is_hor(att_x, att_y)) {
+		double d = p.dist_to_stage({att_x, att_y, {}});
+		double y0 = p.project_to_stage({att_x, att_y, {}}).y;
+		double x0 = att_x;
+		for (auto pt : generate_offsets(d, n)) {
+			int mpl = att_y > y0 ? -1 : 1;
+			bool special = pt.y != 0;
+			Placement pos = {x0 + pt.x, y0 - mpl * pt.y};
+			if (p.is_valid_pos(pos.x, pos.y))
+				res.push_back({pos, special});
+		}
+		return res;
+	}
+	if (p.is_ver(att_x, att_y)) {
+		double d = p.dist_to_stage({att_x, att_y, {}});
+		double x0 = p.project_to_stage({att_x, att_y, {}}).x;
+		double y0 = att_y;
+		for (auto pt : generate_offsets(d, n)) {
+			int mpl = att_x > x0 ? -1 : 1;
+			bool special = pt.y != 0;
+			Placement pos = {x0 - mpl * pt.y, y0 + pt.x};
+			if (p.is_valid_pos(pos.x, pos.y))
+				res.push_back({pos, special});
+		}
+		return res;
+	}
+	return res;
+}
 
 vector<Placement> generate_locations(const Problem &p, double att_x, double att_y, int n) {
 	vector<Placement> res;
@@ -1069,8 +1144,8 @@ static double sqdist(double x0, double y0, double x1, double y1) {
 	return Sqr(x1-x0) + Sqr(y1-y0);
 }
 
-Solution get_assigned_placement(const Problem &p, bool &assigned) {
-	vector<pair<double, Placement>> cands;
+Solution get_assigned_placement(const Problem &p, bool &assigned, bool two_row) {
+	vector<tuple<double, Placement, int>> cands;
 	int m = (int)p.attendees.size();
 	int n = (int)p.musicians.size();
 	assigned = false;
@@ -1080,17 +1155,27 @@ Solution get_assigned_placement(const Problem &p, bool &assigned) {
 		int cnt = int(ceil(2000 / d));
 		double x = p.attendees[i].x;
 		double y = p.attendees[i].y;
-		for (auto pt : generate_locations(p, x, y, cnt)) {
-			double score = w / sqdist(pt.x, pt.y, x, y);
-			if (score > 0)
-				cands.push_back({-score, pt});
+		if (two_row) {
+			for (auto [pt, special] : generate_locations2(p, x, y, cnt)) {
+				double score = w / sqdist(pt.x, pt.y, x, y);
+				if (score > 0)
+					cands.push_back({-score, pt, special ? i : -1});
+			}
+		} else {
+			for (auto pt : generate_locations(p, x, y, cnt)) {
+				double score = w / sqdist(pt.x, pt.y, x, y);
+				if (score > 0)
+					cands.push_back({-score, pt, -1});
+			}
 		}
 	}
 	sort(cands.begin(), cands.end());
 	Solution res;
-	for (auto [score, pt] : cands) {
+	vector<int> preference;
+	for (auto [score, pt, att] : cands) {
 		if (can_place(res, pt.x, pt.y)) {
 			res.placements.push_back(pt);
+			preference.push_back(att);
 		}
 	}
 	int q = (int)res.placements.size();
@@ -1104,19 +1189,19 @@ Solution get_assigned_placement(const Problem &p, bool &assigned) {
 				int inst = p.musicians[i];
 				double t = 0;
 				// todo: pillars??
-				for (int k = 0; k < m; k++) {
+				int k0 = 0, k1 = m - 1;
+				//if (preference[j] != -1) { k0 = k1 = preference[j]; }
+				for (int k = k0; k <= k1; k++) {
 					double d2 = Sqr(res.placements[j].x - p.attendees[k].x) + Sqr(res.placements[j].y - p.attendees[k].y);
 					t += 1000000 * p.attendees[k].tastes[inst] / d2;
 				}
 				mat[i][j] = -t;
 			}
 		auto ass = get_optimal_assignment(mat);
-		//fprintf(stderr, "stage 1\n");
 		vector<Placement> chosen;
 		for (auto idx : ass)
 			chosen.push_back(res.placements[idx]);
 		res.placements = chosen;
-		//fprintf(stderr, "stage 2\n");
 	} else {
 		// add some random points
 		for (int i=q; i<n; i++)
@@ -1591,6 +1676,7 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 				//auto after = s0.score;
 				//fprintf(stderr, "wiggle = %.0f\n", after - before);
 			}
+			s0 = wiggle_together(p, s0);
 		}
 		else if (solver == "smart") {
 			int mask = side_mask < 0 ? iters % 16 : side_mask;
@@ -1602,6 +1688,7 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 				//auto after = s0.score;
 				//fprintf(stderr, "wiggle = %.0f\n", after - before);
 			}
+			s0 = wiggle_together(p, s0);
 		}
 		else if (solver == "compact") {
 			if (iters >= 9) break;
@@ -1620,10 +1707,17 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 		}
 		else if (solver == "assign") {
 			bool assigned = false;
-			s0 = get_assigned_placement(p, /* out */ assigned);
+			s0 = get_assigned_placement(p, /* out */ assigned, false);
 			if (assigned) stop = true;
 			s0 = solve_assignment(p, s0);
 			s0 = wiggle(p, s0);
+		}
+		else if (solver == "assign2") {
+			bool assigned = false;
+			s0 = get_assigned_placement(p, /* out */ assigned, true);
+			if (assigned) stop = true;
+			// s0 = solve_assignment(p, s0);
+			// no wiggle!
 		}
 		else if (solver == "stats") {
 			print_stats(p);
@@ -1682,6 +1776,8 @@ void investigation()
 }
 
 int main(int argc, char *argv[]) {
+	//generate_offsets(20, 10);
+	//return 0;
 	//investigation();
 	//return 0;
 

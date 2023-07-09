@@ -14,6 +14,7 @@ struct Point
 	gbase len2() const { return x*x + y*y; }
 	double len() const { return sqrt(len2()); }
 	Point normalized() const { double t = len(); return Point(x/t, y/t); }
+	Point rot90() const { return {-y, x}; }
 	friend Point operator + (const Point &a, const Point &b) { return Point(a.x + b.x, a.y + b.y); }
 	friend Point operator - (const Point &a, const Point &b) { return Point(a.x - b.x, a.y - b.y); }
 	friend Point operator * (gbase k, const Point &p) { return Point(p.x * k, p.y * k); }
