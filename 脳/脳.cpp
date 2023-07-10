@@ -1585,7 +1585,7 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 			ind = i;
 		}
 	}
-	cerr << "max cost " << max_cost << "\n";
+	//cerr << "max cost " << max_cost << "\n";
 
 	vector< pair< T, int > > bord;
 	while (true)
