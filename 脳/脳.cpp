@@ -1480,6 +1480,53 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 			T nei2 = T( next.x-ovec.x*5.+dvec.x*(5.-0.000001), next.x-ovec.y*5.+dvec.y*(5.-0.000001) );
 			cost += get_dp_weight( p, att, next, cur, nei2 );
 
+			T m1, m2;
+			{
+				double delta = step*j*0.5;
+				double delta2 = delta - (delta-5.);
+				double dd = min( delta2, delta*2-delta2 );
+				double shift = sqrt( max( 0., 100. - delta*delta ) ) + 0.00001;
+				T cc = T( cur.x + 0.5*(next.x-cur.x)*delta2/delta, cur.y + 0.5*(next.y-cur.y)*delta2/delta );
+				m1 = T( cc.x + ovec.x*shift, cc.y + ovec.y*shift );
+			}
+			{
+				double delta = step*j*0.5;
+				double delta2 = delta + (delta-5.);
+				double dd = min( delta2, delta*2-delta2 );
+				double shift = sqrt( max( 0., 100. - delta*delta ) ) + 0.00001;
+				T cc = T( cur.x + 0.5*(next.x-cur.x)*delta2/delta, cur.y + 0.5*(next.y-cur.y)*delta2/delta );
+				m2 = T( cc.x + ovec.x*shift, cc.y + ovec.y*shift );
+			}
+			vector< pair< T, int > > att2;
+			for (auto a : att)
+			{
+				T A = a.first;
+				bool f1 = false, f2 = false;
+				{
+					double dx = A.x - m1.x, dy = A.y - m1.y;
+					double dx1 = cur.x - m1.x, dy1 = cur.y - m1.y;
+					double dx2 = next.x - m1.x, dy2 = next.y - m1.y;
+					double vec1 = dx*dy1 - dy*dx1;
+					double vec2 = dx*dy2 - dy*dx2;
+					if (vec1 * vec2 < 0.)
+						if (!is_blocked( m1, A, cur, 5. ))
+							if (!is_blocked( m1, A, next, 5. ))
+								f1 = true;
+				}
+				{
+					double dx = A.x - m2.x, dy = A.y - m2.y;
+					double dx1 = cur.x - m2.x, dy1 = cur.y - m2.y;
+					double dx2 = next.x - m2.x, dy2 = next.y - m2.y;
+					double vec1 = dx*dy1 - dy*dx1;
+					double vec2 = dx*dy2 - dy*dx2;
+					if (vec1 * vec2 < 0.)
+						if (!is_blocked( m2, A, cur, 5. ))
+							if (!is_blocked( m2, A, next, 5. ))
+								f2 = true;
+				}
+				if (f1 || f2) att2.push_back( a );
+			}
+
 			for (int q=-substeps; q<=substeps; q++)
 			{
 				double delta = step*j*0.5;
@@ -1488,7 +1535,7 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 				double shift = sqrt( max( 0., 100. - dd*dd ) ) + 0.00001;
 				T cc = T( cur.x + 0.5*(next.x-cur.x)*delta2/delta, cur.y + 0.5*(next.y-cur.y)*delta2/delta );
 				T between = T( cc.x + ovec.x*shift, cc.y + ovec.y*shift );
-				double cost2 = cost + get_dp_weight( p, att, between, cur, next );
+				double cost2 = cost + get_dp_weight( p, att2, between, cur, next );
 				if (cost2 > dp[i+j])
 				{
 					dp[i+j] = cost2;
@@ -2165,6 +2212,8 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 		exit(11);
 	}
 	writeSolution(p, best_solution, fname);
+
+	cerr << "clock " << clock() << "\n";
 }
 
 void investigation()
