@@ -1940,7 +1940,7 @@ Solution wiggle_together(const Problem &p, const Solution &sol) {
 	vector<pair<double, Point>> deltas;
 	for (int dx = -20; dx <= 20; dx++)
 		for (int dy = -20; dy <= 20; dy++) {
-			Point d(dx * 10, dy * 10);
+			Point d(dx * 10.0001, dy * 10.0001);
 			deltas.push_back({d.len(), d});
 		}
 	sort(deltas.begin(), deltas.end());
