@@ -2102,12 +2102,14 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 			bool assigned = false;
 			s0 = get_assigned_placement(p, /* out */ assigned, true, iters & 1, iters & 2, iters & 4);
 			if (assigned && iters >= 7) stop = true;
-			s0 = solve_assignment(p, s0);
-			double before = s0.score;
-			auto s1 = wiggle_together(p, s0);
-			double after = get_score(p, s0, true);
-			if (after > before)
-				s0 = s1;
+			if (new_scoring) {
+				s0 = solve_assignment(p, s0);
+				double before = s0.score;
+				auto s1 = wiggle_together(p, s0);
+				double after = get_score(p, s1, true);
+				if (after > before)
+					s0 = s1;
+			}
 			//fprintf(stderr, "wiggle delta = %.0f\n", after - before);
 			// no wiggle!
 		}
