@@ -1191,7 +1191,7 @@ vector<Point> generate_offsets(double dist, int n, bool even) {
 				double yshift = a.y;
 				double shift = yshift / -v.y;
 				Point tmp = a + v * shift;
-				if (tmp.x - last.x > 4 * R) {
+				if (false) { //if (tmp.x - last.x > 4 * R) {
 					stop = true;
 				} else {
 					last.x = tmp.x;
@@ -1386,7 +1386,7 @@ Solution get_assigned_placement(const Problem &p, bool &assigned, bool two_row, 
 			while(true)
 			{
 				iters++;
-				if (iters > 1000)
+				if (true)//(iters > 1000)
 				{
 					double x = sx + (p.stage_width-20.) * rand()/RAND_MAX + 10.;
 					double y = sy + (p.stage_height-20.) * rand()/RAND_MAX + 10.;
