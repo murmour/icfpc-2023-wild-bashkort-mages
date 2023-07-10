@@ -137,6 +137,12 @@ struct T
 	T( double _x=0., double _y=0.) { x=_x; y=_y; }
 };
 
+bool operator< (const T & a, const T & b)
+{
+	if (a.x != b.x) return a.x < b.x;
+	return a.y < b.y;
+}
+
 bool is_valid( const Problem & problem, const Solution & sol )
 {
 	int n = (int)problem.musicians.size();
@@ -1378,6 +1384,183 @@ Solution get_assigned_placement(const Problem &p, bool &assigned, bool two_row, 
 	return res;
 }
 
+double get_dp_weight( const Problem & p, vector< pair< T, int > > & att, T t, T nei1, T nei2 )
+{
+	if (att.size()==0) return 0.;
+
+	int inst = (int)p.attendees[0].tastes.size();
+	vector< double > w( inst, 0. );
+	for (auto a : att)
+	{
+		T A = a.first;
+		double dx = A.x - t.x, dy = A.y - t.y;
+		bool flag = false;
+		double dx1 = nei1.x - t.x, dy1 = nei1.y - t.y;
+		double dx2 = nei2.x - t.x, dy2 = nei2.y - t.y;
+		double vec1 = dx*dy1 - dy*dx1;
+		double vec2 = dx*dy2 - dy*dx2;
+		if (vec1 * vec2 < 0.)
+			if (!is_blocked( t, A, nei1, 5. ))
+				if (!is_blocked( t, A, nei2, 5. ))
+					flag = true;
+
+		if (flag)
+		{
+			for (int i=0; i<inst; i++)
+				w[i] += ceil( 1'000'000 * p.attendees[a.second].tastes[i] / (dx*dx + dy*dy) );
+		}
+	}
+	return *max_element(w.begin(), w.end());
+}
+
+vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int dir )
+{
+	double sx = p.stage_bottom_left[0];
+	double sy = p.stage_bottom_left[1];
+
+	vector< pair< T, int > > att;
+	int m = (int)p.attendees.size();
+	for (int i=0; i<m; i++)
+	{
+		bool flag = false;
+		double x = p.attendees[i].x;
+		double y = p.attendees[i].y;
+		if (dir==0 && y<=sy) flag = true;
+		if (dir==1 && y>=sy+p.stage_height) flag = true;
+		if (dir==2 && x<=sx) flag = true;
+		if (dir==3 && x>=sx+p.stage_width) flag = true;
+		if (flag)
+		{
+			//auto w = avg_taste ? p.attendees[i].avg_taste() : p.attendees[i].max_taste();
+			att.push_back( make_pair( T( x, y ), i ) );
+		}
+	}
+
+	double step = 0.500001;
+	int k = floor((p.stage_width-20)/step)+1;
+	if (dir>=2) k = floor((p.stage_height-20)/step)+1;
+	vector< double > dp( k, 0. );
+	vector< int > prev( k, -1 );
+	vector< T > row2( k, T(0.,0.) );
+	T start = T( dir==3 ? sx+p.stage_width-10. : sx+10., dir==1 ? sy+p.stage_height-10. : sy+10. );
+	vector< T > dv = { T(1.,0.), T(1.,0.), T(0.,1.), T(0.,1.) };
+	T dvec = dv[dir];
+	vector< T > ort = { T(0.,1.), T(0.,-1.), T(1.,0.), T(-1.,0.) };
+	T ovec = ort[dir];
+
+	for (int i=0; i<k; i++)
+	{
+		T t = T( start.x + dvec.x*step*i, start.y + dvec.y*step*i );
+		T nei1 = T( t.x+ovec.x*5.-dvec.x*5., t.x+ovec.y*5.-dvec.y*5. );
+		T nei2 = T( t.x-ovec.x*5.+dvec.x*(5.-0.000001), t.x-ovec.y*5.+dvec.y*(5.-0.000001) );
+		dp[i] = get_dp_weight( p, att, t, nei1, nei2 );
+	}
+	for (int i=0; i<k; i++)
+	{
+		T cur = T( start.x + dvec.x*step*i, start.y + dvec.y*step*i );
+		for (int j=ceil(10./step); j<=ceil(10./step)*2; j++)
+		{
+			if (i+j>=k) break;
+			T next = T( start.x + dvec.x*step*(i+j), start.y + dvec.y*step*(i+j) );
+			T cc = T( (cur.x+next.x)*0.5, (cur.y+next.y)*0.5 );
+			double delta = step*j*0.5;
+			double shift = sqrt( max( 0., 100. - delta*delta ) ) + 0.000001;
+			T between = T( cc.x + ovec.x*shift, cc.y + ovec.y*shift );
+			double cost = dp[i];
+			T nei1 = T( cur.x-ovec.x*5.-dvec.x*(5.+0.000001), cur.x-ovec.y*5.-dvec.y*(5.+0.000001) );
+			cost += get_dp_weight( p, att, cur, nei1, next );
+			cost += get_dp_weight( p, att, between, cur, next );
+			T nei2 = T( next.x-ovec.x*5.+dvec.x*(5.-0.000001), next.x-ovec.y*5.+dvec.y*(5.-0.000001) );
+			cost += get_dp_weight( p, att, next, cur, nei2 );
+			if (cost > dp[i+j])
+			{
+				dp[i+j] = cost;
+				prev[i+j] = i;
+				row2[i+j] = between;
+			}
+		}
+	}
+
+	double max_cost = 0.;
+	int ind = 0;
+	for (int i=0; i<k; i++)
+	{
+		T cur = T( start.x + dvec.x*step*i, start.y + dvec.y*step*i );
+		T nei1 = T( cur.x-ovec.x*5.-dvec.x*(5.+0.000001), cur.x-ovec.y*5.-dvec.y*(5.+0.000001) );
+		T nei2 = T( cur.x+ovec.x*5.+dvec.x*5., cur.x+ovec.y*5.+dvec.y*5. );
+		double cost = dp[i] + get_dp_weight( p, att, cur, nei1, nei2 );
+		if (cost > max_cost)
+		{
+			max_cost = cost;
+			ind = i;
+		}
+	}
+	cerr << "max cost " << max_cost << "\n";
+
+	vector< pair< T, int > > bord;
+	while (true)
+	{
+		T cur = T( start.x + dvec.x*step*ind, start.y + dvec.y*step*ind );
+		bord.push_back( make_pair( cur, ind ) );
+		if (prev[ind]==-1) break;
+		//res.placements.push_back( {row2[ind].x, row2[ind].y} );
+		ind = prev[ind];
+	}
+	reverse( bord.begin(), bord.end() );
+
+	vector< pair< double, T > > res;
+	for (int i=0; i<(int)bord.size(); i++)
+	{
+		T t = bord[i].first;
+		T nei1 = T( t.x+ovec.x*5.-dvec.x*5., t.x+ovec.y*5.-dvec.y*5. );
+		if (i>0) nei1 = bord[i-1].first;
+		T nei2 = T( t.x+ovec.x*5.+dvec.x*5., t.x+ovec.y*5.+dvec.y*5. );
+		if (i<(int)bord.size()-1) nei2 = bord[(int)bord.size()-1].first;
+		res.push_back( make_pair( get_dp_weight( p, att, t, nei1, nei2 ), t ) );
+		if (i>0)
+		{
+			T btw = row2[bord[i].second];
+			res.push_back( make_pair( get_dp_weight( p, att, btw, bord[i-1].first, bord[i].first ), btw ) );
+		}
+	}
+
+	return res;
+}
+
+Solution get_dp_border_placement( const Problem & p, int mask )
+{
+	int n = (int)p.musicians.size();
+	int m = (int)p.attendees.size();
+	vector< pair< double, T > > tmp_res;
+	for (int i=0; i<4; i++)
+		if ((mask>>i)&1)
+		{
+			auto tmp = get_dp_dir_border_placement( p, i );
+			for (auto t : tmp)
+				tmp_res.push_back( t );
+		}
+	sort( tmp_res.begin(), tmp_res.end() );
+	reverse( tmp_res.begin(), tmp_res.end() );
+	Solution res;
+	for (auto x : tmp_res)
+		if( can_place( res, x.second.x, x.second.y ) )
+		{
+			res.placements.push_back( { x.second.x, x.second.y } );
+			if (res.placements.size()==n) return res;
+		}
+
+	double sx = p.stage_bottom_left[0];
+	double sy = p.stage_bottom_left[1];
+	while ((int)res.placements.size() < n)
+	{
+		double x = sx + (p.stage_width-20.) * rand()/RAND_MAX + 10.;
+		double y = sy + (p.stage_height-20.) * rand()/RAND_MAX + 10.;
+		if (can_place( res, x, y )) res.placements.push_back( { x, y } );
+	}
+
+	return res;
+}
+
 Solution get_compact_placement(const Problem &p, int xmode = 0, int ymode = 0) {
 	int n = (int)p.musicians.size();
 	int k = (int)ceil(sqrt(n));
@@ -1915,6 +2098,11 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 				s0 = s1;
 			//fprintf(stderr, "wiggle delta = %.0f\n", after - before);
 			// no wiggle!
+		}
+		else if (solver == "dp") {
+			s0 = get_dp_border_placement( p, 15 );
+			s0 = solve_assignment(p, s0);
+			stop = true;
 		}
 		else if (solver == "stats") {
 			print_stats(p);
