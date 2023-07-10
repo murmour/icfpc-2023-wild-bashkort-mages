@@ -179,12 +179,18 @@ def draw_sol() -> None:
     if suki_mode or sol is None:
         return
     fit_pixel_size_to_prob()
-    for p in sol['placements']:
+    for p, v in zip(sol['placements'], sol['volumes']):
         x = p['x']
         y = p['y']
         (x0, y0) = project(x, y)
         (r, _) = project(5, 0)
-        canvas.create_oval(x0-r, y0-r, x0+r, y0+r, tags='sol')
+        if v == 10:
+            canvas.create_oval(x0-r, y0-r, x0+r, y0+r, tags='sol')
+            continue
+        if v == 0:
+            canvas.create_oval(x0-r, y0-r, x0+r, y0+r, fill='grey', tags='sol')
+            continue
+        assert(False)
 
 
 def suki_to_color(suki: float) -> str:
