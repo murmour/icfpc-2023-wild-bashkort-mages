@@ -1449,7 +1449,7 @@ double get_dp_weight( const Problem & p, vector< pair< T, int > > & att, T t, T 
 	return *max_element(w.begin(), w.end());
 }
 
-vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int dir, int cnt, int substeps )
+vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int dir, int cnt, int substeps, bool support_assign )
 {
 	double sx = p.stage_bottom_left[0];
 	double sy = p.stage_bottom_left[1];
@@ -1478,18 +1478,125 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 	if (dir>=2) k = floor((p.stage_height-20)/step)+1;
 	vector< double > dp( k, 0. );
 	vector< int > prev( k, -1 );
-	vector< T > row2( k, T(0.,0.) );
+	vector< vector< pair< T, double > > > row2( k );
 	T start = T( dir==3 ? sx+p.stage_width-10. : sx+10., dir==1 ? sy+p.stage_height-10. : sy+10. );
 	vector< T > dv = { T(1.,0.), T(1.,0.), T(0.,1.), T(0.,1.) };
 	T dvec = dv[dir];
 	vector< T > ort = { T(0.,1.), T(0.,-1.), T(1.,0.), T(-1.,0.) };
 	T ovec = ort[dir];
 
+	vector< vector< pair< pair< int, double >, vector< pair< T, double > > > > > edges( k );
+	if (support_assign)
+	{
+		vector< pair< double, int > > nearest;
+		for (auto a : att)
+			nearest.push_back( make_pair( p.dist_to_stage( p.attendees[a.second] ), a.second ) );
+		sort( nearest.begin(), nearest.end() );
+		nearest.resize( min( 100, (int)nearest.size() ) );
+		for (auto a : nearest)
+			for (int i=2; i<=10; i++)
+				for (int j=0; j<=1; j++)
+				{
+					double ax = p.attendees[a.second].x;
+					double ay = p.attendees[a.second].y;
+					vector< pair< Placement, bool > > bunch = generate_locations2( p, ax, ay, i, j );
+					if ( bunch.size() < 3 ) continue;
+					T mi = T( 100500., 100500. ), ma = T( -100500., -100500. );
+					for (auto pp : bunch)
+						if (!pp.second)
+						{
+							if (dir==0 || dir==1)
+							{
+								if (pp.first.x < mi.x) mi = T( pp.first.x, pp.first.y );
+								if (pp.first.x > ma.x) ma = T( pp.first.x, pp.first.y );
+							}
+							else
+							{
+								if (pp.first.y < mi.y) mi = T( pp.first.x, pp.first.y );
+								if (pp.first.y > ma.y) ma = T( pp.first.x, pp.first.y );
+							}
+						}
+					vector< pair< T, double > > between[2];
+					int mi_pos, ma_pos;
+					if (dir==0 || dir==1)
+					{
+						//T cur = T( start.x + dvec.x*step*i, start.y + dvec.y*step*i );
+						mi_pos = (int)( floor( (mi.x-start.x)/(dvec.x*step) ) + 0.001);
+						ma_pos = (int)( ceil( (mi.x-start.x)/(dvec.x*step) ) + 0.001);
+						mi.x = start.x + dvec.x*step*mi_pos;
+						ma.x = start.x + dvec.x*step*ma_pos;
+						for (auto pp : bunch)
+							if (mi.x+5. < pp.first.x && pp.first.x < ma.x-5.)
+								between[pp.second?1:0].push_back( make_pair( T(pp.first.x, pp.first.y), 0. ) );
+						if (between[0].size() < 2) continue;
+						if (between[1].size() < 2) continue;
+						sort( between[0].begin(), between[0].end(),
+							[]( const pair< T, bool > & a, const pair< T, bool > & b ) -> bool
+							{ return a.first.x < b.first.x; } );
+						sort( between[1].begin(), between[1].end(),
+							[]( const pair< T, bool > & a, const pair< T, bool > & b ) -> bool
+							{ return a.first.x < b.first.x; } );
+					}
+					else
+					{
+						mi_pos = (int)( floor( (mi.y-start.y)/(dvec.y*step) ) + 0.001);
+						ma_pos = (int)( ceil( (mi.y-start.y)/(dvec.y*step) ) + 0.001);
+						mi.y = start.y + dvec.y*step*mi_pos;
+						ma.y = start.y + dvec.y*step*ma_pos;
+						for (auto pp : bunch)
+							if (mi.y+5. < pp.first.y && pp.first.y < ma.y-5.)
+								between[pp.second?1:0].push_back( make_pair( T(pp.first.x, pp.first.y), 0. ) );
+						if (between[0].size() < 2) continue;
+						if (between[1].size() < 2) continue;
+						sort( between[0].begin(), between[0].end(),
+							[]( const pair< T, bool > & a, const pair< T, bool > & b ) -> bool
+							{ return a.first.y < b.first.y; } );
+						sort( between[1].begin(), between[1].end(),
+							[]( const pair< T, bool > & a, const pair< T, bool > & b ) -> bool
+							{ return a.first.y < b.first.y; } );
+					}
+
+					if (mi_pos < 0 || ma_pos >= k) continue;
+
+					double cost = 0.;
+					T nei1 = T( mi.x-ovec.x*5.-dvec.x*(5.+0.000001), mi.y-ovec.y*5.-dvec.y*(5.+0.000001) );
+					T nei2 = T( ma.x-ovec.x*5.+dvec.x*(5.-0.000001), ma.y-ovec.y*5.+dvec.y*(5.-0.000001) );
+					
+					cost += get_dp_weight( p, att, mi, nei1, between[0][0].first );
+					cost += get_dp_weight( p, att, ma, between[0][(int)between[0].size()-1].first, nei2 );
+					
+					for (int g=0; g<(int)between[0].size(); g++)
+					{
+						T L = (g==0 ? mi : between[0][g-1].first);
+						T R = (g==(int)between[0].size()-1 ? ma : between[0][g+1].first);
+						between[0][g].second = get_dp_weight( p, att, between[0][g].first, L, R );
+						cost += between[0][g].second;
+					}
+					for (int g=0; g<(int)between[1].size(); g++)
+					{
+						between[1][g].second += get_dp_weight( p, att, between[1][g].first, mi, between[0][0].first );
+						between[1][g].second += get_dp_weight( p, att, between[1][g].first, between[0][(int)between[0].size()-1].first, ma );
+						for (int h=0; h<(int)between[0].size()-1; h++)
+							between[1][g].second += get_dp_weight( p, att, between[1][g].first, between[0][h].first, between[0][h+1].first );
+						cost += between[1][g].second;
+					}
+
+					vector< pair< T, double > > res;
+					res.push_back( between[0][0] );
+					res.push_back( between[0][(int)between[0].size()-1] );
+					for (int g=1; g<(int)between[0].size()-1; g++)
+						res.push_back( between[0][g] );
+					for (int g=0; g<(int)between[1].size(); g++)
+						res.push_back( between[1][g] );
+					edges[mi_pos].push_back( make_pair( make_pair( ma_pos, cost ), res ) );
+				}
+	}
+
 	for (int i=0; i<k; i++)
 	{
 		T t = T( start.x + dvec.x*step*i, start.y + dvec.y*step*i );
-		T nei1 = T( t.x+ovec.x*5.-dvec.x*5., t.x+ovec.y*5.-dvec.y*5. );
-		T nei2 = T( t.x-ovec.x*5.+dvec.x*(5.-0.000001), t.x-ovec.y*5.+dvec.y*(5.-0.000001) );
+		T nei1 = T( t.x+ovec.x*5.-dvec.x*5., t.y+ovec.y*5.-dvec.y*5. );
+		T nei2 = T( t.x-ovec.x*5.+dvec.x*(5.-0.000001), t.y-ovec.y*5.+dvec.y*(5.-0.000001) );
 		dp[i] = get_dp_weight( p, att, t, nei1, nei2 );
 	}
 	for (int i=0; i<k; i++)
@@ -1500,9 +1607,9 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 			if (i+j>=k) break;
 			T next = T( start.x + dvec.x*step*(i+j), start.y + dvec.y*step*(i+j) );
 			double cost = dp[i];
-			T nei1 = T( cur.x-ovec.x*5.-dvec.x*(5.+0.000001), cur.x-ovec.y*5.-dvec.y*(5.+0.000001) );
+			T nei1 = T( cur.x-ovec.x*5.-dvec.x*(5.+0.000001), cur.y-ovec.y*5.-dvec.y*(5.+0.000001) );
 			cost += get_dp_weight( p, att, cur, nei1, next );
-			T nei2 = T( next.x-ovec.x*5.+dvec.x*(5.-0.000001), next.x-ovec.y*5.+dvec.y*(5.-0.000001) );
+			T nei2 = T( next.x-ovec.x*5.+dvec.x*(5.-0.000001), next.y-ovec.y*5.+dvec.y*(5.-0.000001) );
 			cost += get_dp_weight( p, att, next, cur, nei2 );
 
 			T m1, m2;
@@ -1560,13 +1667,34 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 				double shift = sqrt( max( 0., 100. - dd*dd ) ) + 0.00001;
 				T cc = T( cur.x + 0.5*(next.x-cur.x)*delta2/delta, cur.y + 0.5*(next.y-cur.y)*delta2/delta );
 				T between = T( cc.x + ovec.x*shift, cc.y + ovec.y*shift );
-				double cost2 = cost + get_dp_weight( p, att2, between, cur, next );
-				if (cost2 > dp[i+j])
+				double cost2 = get_dp_weight( p, att2, between, cur, next );
+				if (cost + cost2 > dp[i+j])
 				{
-					dp[i+j] = cost2;
+					dp[i+j] = cost + cost2;
 					prev[i+j] = i;
-					row2[i+j] = between;
+					row2[i+j] = { make_pair( between, cost2 ) };
 				}
+			}
+		}
+
+		for (auto & e : edges[i])
+		{
+			int to = e.first.first;
+			double cost = dp[i] + e.first.second;
+
+			T next = T( start.x + dvec.x*step*to, start.y + dvec.y*step*to );
+			T nei1 = T( cur.x-ovec.x*5.-dvec.x*(5.+0.000001), cur.y-ovec.y*5.-dvec.y*(5.+0.000001) );
+			T nei2 = T( next.x-ovec.x*5.+dvec.x*(5.-0.000001), next.y-ovec.y*5.+dvec.y*(5.-0.000001) );
+			T inter1 = e.second[0].first;
+			T inter2 = e.second[1].first;
+			cost += get_dp_weight( p, att, cur, nei1, inter1 );
+			cost += get_dp_weight( p, att, next, inter2, nei2 );
+
+			if (cost > dp[to])
+			{
+				dp[to] = cost;
+				prev[to] = i;
+				row2[to] = e.second;
 			}
 		}
 	}
@@ -1576,8 +1704,8 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 	for (int i=0; i<k; i++)
 	{
 		T cur = T( start.x + dvec.x*step*i, start.y + dvec.y*step*i );
-		T nei1 = T( cur.x-ovec.x*5.-dvec.x*(5.+0.000001), cur.x-ovec.y*5.-dvec.y*(5.+0.000001) );
-		T nei2 = T( cur.x+ovec.x*5.+dvec.x*5., cur.x+ovec.y*5.+dvec.y*5. );
+		T nei1 = T( cur.x-ovec.x*5.-dvec.x*(5.+0.000001), cur.y-ovec.y*5.-dvec.y*(5.+0.000001) );
+		T nei2 = T( cur.x+ovec.x*5.+dvec.x*5., cur.y+ovec.y*5.+dvec.y*5. );
 		double cost = dp[i] + get_dp_weight( p, att, cur, nei1, nei2 );
 		if (cost > max_cost)
 		{
@@ -1602,22 +1730,32 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 	for (int i=0; i<(int)bord.size(); i++)
 	{
 		T t = bord[i].first;
-		T nei1 = T( t.x+ovec.x*5.-dvec.x*5., t.x+ovec.y*5.-dvec.y*5. );
-		if (i>0) nei1 = bord[i-1].first;
-		T nei2 = T( t.x+ovec.x*5.+dvec.x*5., t.x+ovec.y*5.+dvec.y*5. );
-		if (i<(int)bord.size()-1) nei2 = bord[(int)bord.size()-1].first;
+		T nei1 = T( t.x+ovec.x*5.-dvec.x*5., t.y+ovec.y*5.-dvec.y*5. );
+		if (i>0)
+		{
+			if (row2[bord[i].second].size()>1)
+				nei1 = row2[bord[i].second][1].first;
+			else nei1 = bord[i-1].first;
+		}
+		T nei2 = T( t.x+ovec.x*5.+dvec.x*5., t.y+ovec.y*5.+dvec.y*5. );
+		if (i<(int)bord.size()-1)
+		{
+			if (row2[bord[i+1].second].size()>1)
+				nei2 = row2[bord[i+1].second][0].first;
+			else nei2 = bord[i+1].first;
+		}
 		res.push_back( make_pair( get_dp_weight( p, att, t, nei1, nei2 ), t ) );
 		if (i>0)
 		{
-			T btw = row2[bord[i].second];
-			res.push_back( make_pair( get_dp_weight( p, att, btw, bord[i-1].first, bord[i].first ), btw ) );
+			for (auto & pp : row2[bord[i].second])
+				res.push_back( make_pair( pp.second, pp.first ) );
 		}
 	}
 
 	return res;
 }
 
-Solution get_dp_border_placement( const Problem & p, int mask, int cnt, int substeps )
+Solution get_dp_border_placement( const Problem & p, int mask, int cnt, int substeps, bool support_assign )
 {
 	int n = (int)p.musicians.size();
 	//int m = (int)p.attendees.size();
@@ -1625,7 +1763,7 @@ Solution get_dp_border_placement( const Problem & p, int mask, int cnt, int subs
 	for (int i=0; i<4; i++)
 		if ((mask>>i)&1)
 		{
-			auto tmp = get_dp_dir_border_placement( p, i, cnt, substeps );
+			auto tmp = get_dp_dir_border_placement( p, i, cnt, substeps, support_assign );
 			for (auto t : tmp)
 				tmp_res.push_back( t );
 		}
@@ -2200,7 +2338,20 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 			if (auto p = args.get_arg("-sub")) {
 				sscanf(p, "%d", &substeps);
 			}
-			s0 = get_dp_border_placement( p, 15, cnt, substeps );
+			s0 = get_dp_border_placement( p, 15, cnt, substeps, false );
+			s0 = solve_assignment(p, s0);
+			stop = true;
+		}
+		else if (solver == "dpass") {
+			int cnt = 1000;
+			if (auto p = args.get_arg("-count")) {
+				sscanf(p, "%d", &cnt);
+			}
+			int substeps = 0;
+			if (auto p = args.get_arg("-sub")) {
+				sscanf(p, "%d", &substeps);
+			}
+			s0 = get_dp_border_placement( p, 15, cnt, substeps, true );
 			s0 = solve_assignment(p, s0);
 			stop = true;
 		}
