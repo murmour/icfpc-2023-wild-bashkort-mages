@@ -2124,7 +2124,7 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 			if (auto p = args.get_arg("-count")) {
 				sscanf(p, "%d", &cnt);
 			}
-			int substeps = 10;
+			int substeps = 0;
 			if (auto p = args.get_arg("-sub")) {
 				sscanf(p, "%d", &substeps);
 			}
