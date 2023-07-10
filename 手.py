@@ -157,7 +157,7 @@ def score_sol(prob_id: int, sol: dict) -> float:
         return 0
 
 
-def get_best_sol(prob_id) -> str | None:
+def get_best_sol_tag(prob_id) -> str | None:
     best_score = 0
     best_tag = None
     for tag in get_sol_tags(prob_id):
@@ -171,7 +171,7 @@ def get_best_sol(prob_id) -> str | None:
 
 def send_all_best() -> dict:
     for prob_id in all_prob_ids():
-        sol_tag = get_best_sol(prob_id)
+        sol_tag = get_best_sol_tag(prob_id)
         if sol_tag is None:
             print(f'{prob_id}: -')
             continue
@@ -180,7 +180,7 @@ def send_all_best() -> dict:
 
 def send_all_best_lazy(userboard) -> dict:
     for prob_id in all_prob_ids():
-        sol_tag = get_best_sol(prob_id)
+        sol_tag = get_best_sol_tag(prob_id)
         if sol_tag is None:
             print(f'{prob_id}: -')
             continue
@@ -202,22 +202,27 @@ def print_prob_stats(prob_id: int) -> dict:
     print(f'  stage_size: {p["stage_width"]}x{p["stage_height"]}')
 
 
-def print_sol_stats() -> None:
+def print_sol_stats(print_all_sols = True) -> None:
     total_score = 0
     for prob_id in all_prob_ids():
-        print(f'{prob_id}:')
+        if print_all_sols:
+            print(f'{prob_id}:')
         sol_tags = get_sol_tags(prob_id)
         best = None
         best_score = 0
         for tag in sol_tags:
             score = get_score(prob_id, tag)
-            print(f'  {tag} = {score:,}')
+            if print_all_sols:
+                print(f'  {tag} = {score:,}')
             if best is None or score > best_score:
                 best = tag
                 best_score = score
 
         if best is not None:
-            print(f'  BEST = {best}({best_score:,})')
+            if print_all_sols:
+                print(f'  BEST = {best}({best_score:,})')
+            else:
+                print(f'{prob_id}: {best}({best_score:,})')
             total_score += max(best_score, 0)
     print()
     print(f'TOTAL = {total_score:,}')
@@ -289,8 +294,7 @@ def parsolve(
         solver_id: str,
         solver_args: str,
         sol_tag: str,
-        start_id: int,
-        end_id: int,
+        prob_ids: list,
         job_count: int
 ) -> None:
 
@@ -314,7 +318,7 @@ def parsolve(
         print(f'{solver_id}({prob_id}) -> OK ({score:,})')
         save_sol(solver_id, prob_id, sol_tag, sol)
 
-    queue = list(range(start_id, end_id+1))
+    queue = list(prob_ids)
     pool = [None] * job_count
     left = len(queue)
     while left > 0:
@@ -340,7 +344,7 @@ def parsolve(
 
 
 def get_best_score(prob_id: int) -> float:
-    sol_tag = get_best_sol(prob_id)
+    sol_tag = get_best_sol_tag(prob_id)
     return 0 if sol_tag is None else get_score(prob_id, sol_tag)
 
 
@@ -487,6 +491,17 @@ def volumize_all_sols() -> None:
                 # save_sol('volumize', prob_id, sol_tag, vol_sol)
 
 
+def dp_is_best(prob_id: int) -> bool:
+    sol_tag = get_best_sol_tag(prob_id)
+    if sol_tag is None:
+        return False
+    for pre in ['dp_', 'dpf_', 'dpff_']:
+        if sol_tag.startswith(pre):
+            return True
+    print(f'{prob_id}\'s best is not dp')
+    return False
+
+
 if __name__ == '__main__':
     cmd = sys.argv[1]
 
@@ -507,7 +522,11 @@ if __name__ == '__main__':
         start_id = int(sys.argv[5])
         end_id = int(sys.argv[6])
         job_count = int(sys.argv[7])
-        parsolve(solver_id, solver_args, sol_id, start_id, end_id, job_count)
+        prob_ids = range(start_id, end_id+1)
+        if solver_id == 'dp_if_best':
+            solver_id = 'dp'
+            prob_ids = [ pid for pid in prob_ids if dp_is_best(pid) ]
+        parsolve(solver_id, solver_args, sol_id, prob_ids, job_count)
         exit(0)
 
     if cmd == 'download_probs':
@@ -522,7 +541,11 @@ if __name__ == '__main__':
         exit(0)
 
     if cmd == 'get_sol_stats':
-        print_sol_stats()
+        print_sol_stats(print_all_sols = True)
+        exit(0)
+
+    if cmd == 'get_best_sols':
+        print_sol_stats(print_all_sols = False)
         exit(0)
 
     if cmd == 'get_sorted_scores':
