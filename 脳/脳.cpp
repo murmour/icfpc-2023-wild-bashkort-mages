@@ -1424,7 +1424,7 @@ double get_dp_weight( const Problem & p, vector< pair< T, int > > & att, T t, T 
 	return *max_element(w.begin(), w.end());
 }
 
-vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int dir, int cnt )
+vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int dir, int cnt, int substeps )
 {
 	double sx = p.stage_bottom_left[0];
 	double sy = p.stage_bottom_left[1];
@@ -1474,21 +1474,27 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 		{
 			if (i+j>=k) break;
 			T next = T( start.x + dvec.x*step*(i+j), start.y + dvec.y*step*(i+j) );
-			T cc = T( (cur.x+next.x)*0.5, (cur.y+next.y)*0.5 );
-			double delta = step*j*0.5;
-			double shift = sqrt( max( 0., 100. - delta*delta ) ) + 0.000001;
-			T between = T( cc.x + ovec.x*shift, cc.y + ovec.y*shift );
 			double cost = dp[i];
 			T nei1 = T( cur.x-ovec.x*5.-dvec.x*(5.+0.000001), cur.x-ovec.y*5.-dvec.y*(5.+0.000001) );
 			cost += get_dp_weight( p, att, cur, nei1, next );
-			cost += get_dp_weight( p, att, between, cur, next );
 			T nei2 = T( next.x-ovec.x*5.+dvec.x*(5.-0.000001), next.x-ovec.y*5.+dvec.y*(5.-0.000001) );
 			cost += get_dp_weight( p, att, next, cur, nei2 );
-			if (cost > dp[i+j])
+
+			for (int q=-substeps; q<=substeps; q++)
 			{
-				dp[i+j] = cost;
-				prev[i+j] = i;
-				row2[i+j] = between;
+				double delta = step*j*0.5;
+				double delta2 = delta + (substeps==0 ? 0. : (delta-5.00001)*q/substeps);
+				double dd = min( delta2, delta*2-delta2 );
+				double shift = sqrt( max( 0., 100. - dd*dd ) ) + 0.00001;
+				T cc = T( cur.x + 0.5*(next.x-cur.x)*delta2/delta, cur.y + 0.5*(next.y-cur.y)*delta2/delta );
+				T between = T( cc.x + ovec.x*shift, cc.y + ovec.y*shift );
+				double cost2 = cost + get_dp_weight( p, att, between, cur, next );
+				if (cost2 > dp[i+j])
+				{
+					dp[i+j] = cost2;
+					prev[i+j] = i;
+					row2[i+j] = between;
+				}
 			}
 		}
 	}
@@ -1539,7 +1545,7 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 	return res;
 }
 
-Solution get_dp_border_placement( const Problem & p, int mask, int cnt )
+Solution get_dp_border_placement( const Problem & p, int mask, int cnt, int substeps )
 {
 	int n = (int)p.musicians.size();
 	//int m = (int)p.attendees.size();
@@ -1547,7 +1553,7 @@ Solution get_dp_border_placement( const Problem & p, int mask, int cnt )
 	for (int i=0; i<4; i++)
 		if ((mask>>i)&1)
 		{
-			auto tmp = get_dp_dir_border_placement( p, i, cnt );
+			auto tmp = get_dp_dir_border_placement( p, i, cnt, substeps );
 			for (auto t : tmp)
 				tmp_res.push_back( t );
 		}
@@ -2118,7 +2124,11 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 			if (auto p = args.get_arg("-count")) {
 				sscanf(p, "%d", &cnt);
 			}
-			s0 = get_dp_border_placement( p, 15, cnt );
+			int substeps = 10;
+			if (auto p = args.get_arg("-sub")) {
+				sscanf(p, "%d", &substeps);
+			}
+			s0 = get_dp_border_placement( p, 15, cnt, substeps );
 			s0 = solve_assignment(p, s0);
 			stop = true;
 		}
