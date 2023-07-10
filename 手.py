@@ -202,26 +202,25 @@ def print_prob_stats(prob_id: int) -> dict:
     print(f'  stage_size: {p["stage_width"]}x{p["stage_height"]}')
 
 
-total_score = 0
+def print_sol_stats() -> None:
+    total_score = 0
+    for prob_id in all_prob_ids():
+        print(f'{prob_id}:')
+        sol_tags = get_sol_tags(prob_id)
+        best = None
+        best_score = 0
+        for tag in sol_tags:
+            score = get_score(prob_id, tag)
+            print(f'  {tag} = {score:,}')
+            if best is None or score > best_score:
+                best = tag
+                best_score = score
 
-def print_sol_stats(prob_id: int) -> dict:
-    global total_score
-
-    print(f'{prob_id}:')
-    sol_tags = get_sol_tags(prob_id)
-
-    best = None
-    best_score = 0
-    for tag in sol_tags:
-        score = get_score(prob_id, tag)
-        print(f'  {tag} = {score}')
-        if best is None or score > best_score:
-            best = tag
-            best_score = score
-
-    if best is not None:
-        print(f'  BEST = {best}({best_score})')
-        total_score += max(best_score, 0)
+        if best is not None:
+            print(f'  BEST = {best}({best_score:,})')
+            total_score += max(best_score, 0)
+    print()
+    print(f'TOTAL = {total_score:,}')
 
 
 # solver CLI:
@@ -523,10 +522,7 @@ if __name__ == '__main__':
         exit(0)
 
     if cmd == 'get_sol_stats':
-        for pid in all_prob_ids():
-            print_sol_stats(pid)
-            print()
-        print(f'TOTAL = {total_score}')
+        print_sol_stats()
         exit(0)
 
     if cmd == 'get_sorted_scores':
