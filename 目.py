@@ -248,6 +248,24 @@ def on_click2(event) -> None:
 canvas.bind("<Button-3>", on_click2)
 
 
+def on_wheel_down(event):
+    xx = canvas.canvasx(event.x)
+    yy = canvas.canvasy(event.y)
+    canvas.scale('all', xx, yy, 1.1, 1.1)
+
+
+def on_wheel_up(event):
+    xx = canvas.canvasx(event.x)
+    yy = canvas.canvasy(event.y)
+    factor = 1/1.1
+    canvas.scale('all', xx, yy, factor, factor)
+
+
+# root.bind("<MouseWheel>", mouse_wheel)
+root.bind("<Button-5>", on_wheel_down)
+root.bind("<Button-4>", on_wheel_up)
+
+
 def update_top_label() -> None:
     p = prob
     score = f'{sol["score"]:,}' if sol is not None else '-'
