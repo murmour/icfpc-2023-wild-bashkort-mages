@@ -165,7 +165,7 @@ def get_best_sol(prob_id) -> str | None:
         if score > best_score:
             best_score = score
             best_tag = tag
-    print(f'{prob_id}: {best_tag} ({best_score}:,)')
+    print(f'{prob_id}: {best_tag} ({best_score:,})')
     return best_tag
 
 
