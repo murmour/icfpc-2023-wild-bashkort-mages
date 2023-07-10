@@ -1378,12 +1378,37 @@ Solution get_assigned_placement(const Problem &p, bool &assigned, bool two_row, 
 		res.placements = chosen;
 	} else {
 		// add some random points
+		double sx = p.stage_bottom_left[0];
+		double sy = p.stage_bottom_left[1];
 		for (int i=q; i<n; i++)
 		{
+			int iters = 0;
 			while(true)
 			{
-				double x = p.stage_bottom_left[0] + (p.stage_width-20.) * rand()/RAND_MAX + 10.;
-				double y = p.stage_bottom_left[1] + (p.stage_height-20.) * rand()/RAND_MAX + 10.;
+				iters++;
+				if (iters > 1000)
+				{
+					double x = sx + (p.stage_width-20.) * rand()/RAND_MAX + 10.;
+					double y = sy + (p.stage_height-20.) * rand()/RAND_MAX + 10.;
+					if (can_place( res, x, y ))
+					{
+						res.placements.push_back( { x, y } );
+						break;
+					}
+					else continue;
+				}
+				int side = rand()%4;
+				double x, y;
+				if (side==0 || side==1)
+					x = sx + (p.stage_width-20.) * rand()/RAND_MAX + 10.;
+				else if (side==2)
+					x = sx + 10.;
+				else x = sx + p.stage_width - 10.;
+				if (side==2 || side==3)
+					y = sy + (p.stage_height-20.) * rand()/RAND_MAX + 10.;
+				else if (side==0)
+					y = sy + 10.;
+				else y = sy + p.stage_height - 10.;
 				if (can_place( res, x, y ))
 				{
 					res.placements.push_back( { x, y } );
