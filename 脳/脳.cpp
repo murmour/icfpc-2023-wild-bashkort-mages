@@ -1326,7 +1326,7 @@ Solution get_assigned_placement(const Problem &p, bool &assigned, bool two_row, 
 	for (int i = 0; i < m; i++) {
 		auto w = avg_taste ? p.attendees[i].avg_taste() : p.attendees[i].max_taste();
 		auto d = p.dist_to_stage(p.attendees[i]);
-		int cnt = int(ceil(2000 / d));
+		int cnt = int(ceil(5000 / d));
 		double x = p.attendees[i].x;
 		double y = p.attendees[i].y;
 		if (two_row) {
