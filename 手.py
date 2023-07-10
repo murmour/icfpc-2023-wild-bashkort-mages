@@ -495,7 +495,7 @@ def dp_is_best(prob_id: int) -> bool:
     sol_tag = get_best_sol_tag(prob_id)
     if sol_tag is None:
         return False
-    for pre in ['dp_', 'dpf_', 'dpff_']:
+    for pre in ['dp_', 'dpf_', 'dpff_', 'dpass_']:
         if sol_tag.startswith(pre):
             return True
     print(f'{prob_id}\'s best is not dp')
