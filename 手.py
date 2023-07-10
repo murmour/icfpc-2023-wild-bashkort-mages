@@ -165,7 +165,7 @@ def get_best_sol(prob_id) -> str | None:
         if score > best_score:
             best_score = score
             best_tag = tag
-    print(f'{prob_id}: {best_tag} ({best_score})')
+    print(f'{prob_id}: {best_tag} ({best_score}:,)')
     return best_tag
 
 
@@ -187,7 +187,7 @@ def send_all_best_lazy(userboard) -> dict:
         score = get_score(prob_id, sol_tag)
         remote_score = userboard["problems"][prob_id-1]
         if remote_score is None or score > remote_score:
-            print(f'{prob_id}: {score} > {remote_score}')
+            print(f'{prob_id}: {score:,} > {remote_score:,}')
             send_sol_request(prob_id, sol_tag)
 
 
@@ -281,7 +281,7 @@ def solve(solver_id: str, solver_args: str, sol_tag: str, prob_id: int) -> None:
         return
     sol = json.loads(sol_str)
     score = sol['score']
-    print(f'{solver_id}({prob_id}) -> OK ({score})')
+    print(f'{solver_id}({prob_id}) -> OK ({score:,})')
     save_sol(solver_id, prob_id, sol_tag, sol)
 
 
@@ -311,7 +311,7 @@ def parsolve(
         sol_str = job['process'].communicate()[0].decode()
         sol = json.loads(sol_str)
         score = sol['score']
-        print(f'{solver_id}({prob_id}) -> OK ({score})')
+        print(f'{solver_id}({prob_id}) -> OK ({score:,})')
         save_sol(solver_id, prob_id, sol_tag, sol)
 
     queue = list(range(start_id, end_id+1))
@@ -382,13 +382,13 @@ def get_userboard_request() -> dict:
 def print_scoreboard(sb: dict) -> None:
     print(f'scoreboard at {sb["updated_at"]}:')
     for i, line in enumerate(sb['scoreboard']):
-        print(f'{i+1}. {line["username"]} = {line["score"]}')
+        print(f'{i+1}. {line["username"]} = {line["score"]:,}')
 
 
 def print_userboard(ub: dict) -> None:
     print(f'userboard:')
     for i, score in enumerate(ub['problems']):
-        print(f'{i+1} = {"-" if score is None else score}')
+        print(f'{i+1} = {(0 if score is None else score):,}')
 
 
 def update_username_request(username: str) -> None:
@@ -427,7 +427,7 @@ def patch_scores() -> None:
                 if score == 0:
                     print(f'bad sol: {prob_id}.{sol_tag}')
                     continue
-                print(f'adding score: {prob_id}.{sol_tag} = {score}')
+                print(f'adding score: {prob_id}.{sol_tag} = {score:,}')
                 sol['score'] = score
                 # эту строку нужно раскомментировать при каждом использовании:
                 # save_sol('patch_scores', prob_id, sol_tag, sol)
