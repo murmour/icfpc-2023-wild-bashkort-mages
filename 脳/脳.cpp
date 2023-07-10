@@ -22,6 +22,17 @@ int problem_id = -1;
 int side_mask = -1;
 bool new_scoring = false;
 
+struct ArgParser {
+	int argc;
+	char **argv;
+	char * get_arg(const char * name) {
+		for (int i = 1; i + 1 < argc; i += 2)
+			if (strcmp(argv[i], name) == 0)
+				return argv[i + 1];
+		return nullptr;
+	}
+};
+
 struct Attendee {
 	double x;
 	double y;
@@ -1413,7 +1424,7 @@ double get_dp_weight( const Problem & p, vector< pair< T, int > > & att, T t, T 
 	return *max_element(w.begin(), w.end());
 }
 
-vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int dir )
+vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int dir, int cnt )
 {
 	double sx = p.stage_bottom_left[0];
 	double sy = p.stage_bottom_left[1];
@@ -1436,7 +1447,8 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 		}
 	}
 
-	double step = 0.500001;
+	double step = max(p.stage_height, p.stage_width) / cnt;
+	//double step = 0.500001;
 	int k = floor((p.stage_width-20)/step)+1;
 	if (dir>=2) k = floor((p.stage_height-20)/step)+1;
 	vector< double > dp( k, 0. );
@@ -1527,15 +1539,15 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 	return res;
 }
 
-Solution get_dp_border_placement( const Problem & p, int mask )
+Solution get_dp_border_placement( const Problem & p, int mask, int cnt )
 {
 	int n = (int)p.musicians.size();
-	int m = (int)p.attendees.size();
+	//int m = (int)p.attendees.size();
 	vector< pair< double, T > > tmp_res;
 	for (int i=0; i<4; i++)
 		if ((mask>>i)&1)
 		{
-			auto tmp = get_dp_dir_border_placement( p, i );
+			auto tmp = get_dp_dir_border_placement( p, i, cnt );
 			for (auto t : tmp)
 				tmp_res.push_back( t );
 		}
@@ -1546,7 +1558,7 @@ Solution get_dp_border_placement( const Problem & p, int mask )
 		if( can_place( res, x.second.x, x.second.y ) )
 		{
 			res.placements.push_back( { x.second.x, x.second.y } );
-			if (res.placements.size()==n) return res;
+			if ((int)res.placements.size()==n) return res;
 		}
 
 	double sx = p.stage_bottom_left[0];
@@ -1971,7 +1983,7 @@ vector<double> get_instrument_scores(const Problem &p) {
 	return res;
 }
 
-void solve(const string &infile, int timeout, int wiggles, const string &solver, const string &fname) {
+void solve(const string &infile, int timeout, int wiggles, const string &solver, const string &fname, ArgParser &args) {
 	Json::Value root, root_s;
 	Problem p;
 	if (!readJsonFile(infile.c_str(), root)) {
@@ -2100,7 +2112,11 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 			// no wiggle!
 		}
 		else if (solver == "dp") {
-			s0 = get_dp_border_placement( p, 15 );
+			int cnt = 1000;
+			if (auto p = args.get_arg("-count")) {
+				sscanf(p, "%d", &cnt);
+			}
+			s0 = get_dp_border_placement( p, 15, cnt );
 			s0 = solve_assignment(p, s0);
 			stop = true;
 		}
@@ -2138,17 +2154,6 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 	}
 	writeSolution(p, best_solution, fname);
 }
-
-struct ArgParser {
-	int argc;
-	char **argv;
-	char * get_arg(const char * name) {
-		for (int i = 1; i + 1 < argc; i += 2)
-			if (strcmp(argv[i], name) == 0)
-				return argv[i + 1];
-		return nullptr;
-	}
-};
 
 void investigation()
 {
@@ -2260,7 +2265,7 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 
-	solve(in_file, timeout, wiggles, solver, fname);
+	solve(in_file, timeout, wiggles, solver, fname, args);
 	//for (int i=1; i<=45; i++)
 	//	solve(i);
 	return 0;
