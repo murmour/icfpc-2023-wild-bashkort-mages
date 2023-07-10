@@ -526,6 +526,9 @@ if __name__ == '__main__':
         if solver_id == 'dp_if_best':
             solver_id = 'dp'
             prob_ids = [ pid for pid in prob_ids if dp_is_best(pid) ]
+        if solver_id == 'dpass_if_best':
+            solver_id = 'dpass'
+            prob_ids = [ pid for pid in prob_ids if dp_is_best(pid) ]
         parsolve(solver_id, solver_args, sol_id, prob_ids, job_count)
         exit(0)
 
