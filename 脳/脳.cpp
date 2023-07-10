@@ -1486,20 +1486,32 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 	T ovec = ort[dir];
 
 	vector< vector< pair< pair< int, double >, vector< pair< T, double > > > > > edges( k );
+	int edges_total = 0;
 	if (support_assign)
 	{
 		vector< pair< double, int > > nearest;
 		for (auto a : att)
-			nearest.push_back( make_pair( p.dist_to_stage( p.attendees[a.second] ), a.second ) );
+		{
+			double ax = a.first.x, ay = a.first.y;
+			if ( (dir<=1 && sx+10. <= ax && ax <= sx+p.stage_width-10.) ||
+				(dir>=2 && sy+10. <= ay && ay <= sy+p.stage_height-10.) )
+				nearest.push_back( make_pair( p.dist_to_stage( p.attendees[a.second] ), a.second ) );
+		}
 		sort( nearest.begin(), nearest.end() );
 		nearest.resize( min( 100, (int)nearest.size() ) );
 		for (auto a : nearest)
-			for (int i=2; i<=10; i++)
+			for (int i=2; i<=5; i++)
 				for (int j=0; j<=1; j++)
 				{
 					double ax = p.attendees[a.second].x;
 					double ay = p.attendees[a.second].y;
 					vector< pair< Placement, bool > > bunch = generate_locations2( p, ax, ay, i, j );
+					/*if (bunch.size()>0)
+					{
+						cout << bunch.size() << "\n";
+						for (auto b : bunch)
+							cout << b.first.x << " " << b.first.y << "\n";
+					}*/
 					if ( bunch.size() < 3 ) continue;
 					T mi = T( 100500., 100500. ), ma = T( -100500., -100500. );
 					for (auto pp : bunch)
@@ -1516,18 +1528,22 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 								if (pp.first.y > ma.y) ma = T( pp.first.x, pp.first.y );
 							}
 						}
+					//if (bunch.size()>0) cout << mi.x << " " << mi.y << " " << ma.x << " " << ma.y << "\n";
 					vector< pair< T, double > > between[2];
 					int mi_pos, ma_pos;
 					if (dir==0 || dir==1)
 					{
 						//T cur = T( start.x + dvec.x*step*i, start.y + dvec.y*step*i );
 						mi_pos = (int)( floor( (mi.x-start.x)/(dvec.x*step) ) + 0.001);
-						ma_pos = (int)( ceil( (mi.x-start.x)/(dvec.x*step) ) + 0.001);
+						ma_pos = (int)( ceil( (ma.x-start.x)/(dvec.x*step) ) + 0.001);
+						//if (bunch.size()>0) cout << mi_pos << " " << ma_pos << "\n";
 						mi.x = start.x + dvec.x*step*mi_pos;
 						ma.x = start.x + dvec.x*step*ma_pos;
+						//if (bunch.size()>0) cout << mi.x << " " << mi.y << " " << ma.x << " " << ma.y << "\n";
 						for (auto pp : bunch)
-							if (mi.x+5. < pp.first.x && pp.first.x < ma.x-5.)
+							if (mi.x < pp.first.x && pp.first.x < ma.x)
 								between[pp.second?1:0].push_back( make_pair( T(pp.first.x, pp.first.y), 0. ) );
+						//if (bunch.size()>0) cout << between[0].size() << " " << between[1].size() << "\n\n";
 						if (between[0].size() < 2) continue;
 						if (between[1].size() < 2) continue;
 						sort( between[0].begin(), between[0].end(),
@@ -1540,12 +1556,13 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 					else
 					{
 						mi_pos = (int)( floor( (mi.y-start.y)/(dvec.y*step) ) + 0.001);
-						ma_pos = (int)( ceil( (mi.y-start.y)/(dvec.y*step) ) + 0.001);
+						ma_pos = (int)( ceil( (ma.y-start.y)/(dvec.y*step) ) + 0.001);
 						mi.y = start.y + dvec.y*step*mi_pos;
 						ma.y = start.y + dvec.y*step*ma_pos;
 						for (auto pp : bunch)
-							if (mi.y+5. < pp.first.y && pp.first.y < ma.y-5.)
+							if (mi.y < pp.first.y && pp.first.y < ma.y)
 								between[pp.second?1:0].push_back( make_pair( T(pp.first.x, pp.first.y), 0. ) );
+						//cout << between[0].size() << " " << between[1].size() << "\n";
 						if (between[0].size() < 2) continue;
 						if (between[1].size() < 2) continue;
 						sort( between[0].begin(), between[0].end(),
@@ -1589,8 +1606,10 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 					for (int g=0; g<(int)between[1].size(); g++)
 						res.push_back( between[1][g] );
 					edges[mi_pos].push_back( make_pair( make_pair( ma_pos, cost ), res ) );
+					edges_total++;
 				}
 	}
+	//cerr << "edges total " << edges_total << "\n";
 
 	for (int i=0; i<k; i++)
 	{
@@ -1695,6 +1714,7 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 				dp[to] = cost;
 				prev[to] = i;
 				row2[to] = e.second;
+				//cerr << "yeah!\n";
 			}
 		}
 	}
@@ -2403,6 +2423,9 @@ void investigation()
 }
 
 int main(int argc, char *argv[]) {
+
+	//freopen( "output.txt", "w", stdout );
+
 	//generate_offsets(20, 10);
 	//return 0;
 	//investigation();
