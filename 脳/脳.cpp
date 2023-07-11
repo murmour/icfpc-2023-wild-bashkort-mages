@@ -1868,50 +1868,6 @@ Solution get_compact_placement(const Problem &p, int xmode = 0, int ymode = 0) {
 	return res;
 }
 
-// unfinished
-Solution get_spiral_placement(const Problem &p, int iter) {
-	const int n = (int)p.musicians.size();
-	const double sw = p.stage_width;
-	const double sh = p.stage_height;
-	const double center_x = sw/2;
-	const double center_y = sh/2;
-	const double a = 5;
-	const double b = 5;
-	Solution res;
-	fprintf(stderr, "spiral scene: %f %f\n", sw, sh);
-
-	// first point
-	double prev_x = center_x;
-	double prev_y = center_y;
-	int pts = 1;
-	res.placements.push_back({
-		p.stage_bottom_left[0] + prev_x,
-		p.stage_bottom_left[1] + prev_y
-	});
-
-	int i = 1;
-	while (pts < n) {
-		const double angle = 0.01 * i;
-		const double x = center_x + (a + b*angle)*cos(angle);
-		const double y = center_y + (a + b*angle)*sin(angle);
-		if (x < 10 || y < 10 || sw-x < 10 || sh-y < 10) {
-			fprintf(stderr, "hit wall: %f %f\n", x, y);
-			exit(10);
-		}
-		if (sqdist(x, y, prev_x, prev_y) > 100) {
-			fprintf(stderr, "spiral point: %f %f\n", x, y);
-			const double rx = p.stage_bottom_left[0] + x;
-			const double ry = p.stage_bottom_left[1] + y;
-			res.placements.push_back({rx, ry});
-			prev_x = x;
-			prev_y = y;
-			pts++;
-		}
-		i++;
-	}
-	return res;
-}
-
 
 Solution get_normal_placement(const Problem &p) {
 	const int n = (int)p.musicians.size();
@@ -2363,10 +2319,6 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 			if (iters >= 9) break;
 			s0 = get_compact_placement(p, iters % 3, iters / 3);
 		}
-		else if (solver == "spiral") {
-			s0 = get_spiral_placement(p, iters);
-			if (iters > 0) break;
-		}
 		else if (solver == "normal") {
 			s0 = get_normal_placement(p);
 			for (int i = 0; i < wiggles; i++) {
@@ -2575,7 +2527,6 @@ int main(int argc, char *argv[]) {
 	}
 
 	solve(in_file, timeout, wiggles, solver, fname, args);
-	//for (int i=1; i<=45; i++)
-	//	solve(i);
+
 	return 0;
 }
