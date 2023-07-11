@@ -18,226 +18,240 @@ template<typename T> T Sqr(const T &x) { return x * x; }
 
 using namespace std;
 
+
 int problem_id = -1;
 int side_mask = -1;
 bool new_scoring = false;
 
+
 struct ArgParser {
-	int argc;
-	char **argv;
-	char * get_arg(const char * name) {
-		for (int i = 1; i + 1 < argc; i += 2)
-			if (strcmp(argv[i], name) == 0)
-				return argv[i + 1];
-		return nullptr;
-	}
+    int argc;
+    char **argv;
+    char * get_arg(const char * name) {
+        for (int i = 1; i + 1 < argc; i += 2)
+            if (strcmp(argv[i], name) == 0)
+                return argv[i + 1];
+        return nullptr;
+    }
 };
+
 
 struct Attendee {
-	double x;
-	double y;
-	vector<double> tastes;
+    double x;
+    double y;
+    vector<double> tastes;
 
-	double max_taste() const {
-		return *max_element(tastes.begin(), tastes.end());
-	}
+    double max_taste() const {
+        return *max_element(tastes.begin(), tastes.end());
+    }
 
-	double avg_taste() const {
-		double t = 0;
-		for (auto x : tastes) t += x;
-		return t / tastes.size();
-	}
+    double avg_taste() const {
+        double t = 0;
+        for (auto x : tastes) t += x;
+        return t / tastes.size();
+    }
 
-	FLD_BEGIN
-		FLD(x) FLD(y) FLD(tastes)
-	FLD_END
+    FLD_BEGIN
+        FLD(x) FLD(y) FLD(tastes)
+    FLD_END
 };
+
 
 struct Pillar {
-	array<double, 2> center;
-	double radius;
-	FLD_BEGIN FLD(center) FLD(radius) FLD_END
+    array<double, 2> center;
+    double radius;
+    FLD_BEGIN FLD(center) FLD(radius) FLD_END
 };
+
 
 struct Problem {
-	double room_width;
-	double room_height;
-	double stage_width;
-	double stage_height;
-	array<double, 2> stage_bottom_left;
-	vector<int> musicians;
-	vector<Attendee> attendees;
-	vector<Pillar> pillars;
+    double room_width;
+    double room_height;
+    double stage_width;
+    double stage_height;
+    array<double, 2> stage_bottom_left;
+    vector<int> musicians;
+    vector<Attendee> attendees;
+    vector<Pillar> pillars;
 
-	double dist_to_stage(const Attendee &att) const {
-		double sx1 = stage_bottom_left[0] + 10;
-		double sx2 = sx1 + stage_width - 20;
-		double sy1 = stage_bottom_left[1] + 10;
-		double sy2 = sy1 + stage_height - 20;
-		if (sx1 <= att.x && att.x <= sx2)
-			return min(abs(sy1 - att.y), abs(sy2 - att.y));
-		if (sy1 <= att.y && att.y <= sy2)
-			return min(abs(sx1 - att.x), abs(sx2 - att.x));
-		return min(
-			min(hypot(sx1 - att.x, sy1 - att.y), hypot(sx2 - att.x, sy1 - att.y)),
-			min(hypot(sx1 - att.x, sy2 - att.y), hypot(sx2 - att.x, sy2 - att.y)));
-	}
+    double dist_to_stage(const Attendee &att) const {
+        double sx1 = stage_bottom_left[0] + 10;
+        double sx2 = sx1 + stage_width - 20;
+        double sy1 = stage_bottom_left[1] + 10;
+        double sy2 = sy1 + stage_height - 20;
+        if (sx1 <= att.x && att.x <= sx2)
+            return min(abs(sy1 - att.y), abs(sy2 - att.y));
+        if (sy1 <= att.y && att.y <= sy2)
+            return min(abs(sx1 - att.x), abs(sx2 - att.x));
+        return min(
+            min(hypot(sx1 - att.x, sy1 - att.y), hypot(sx2 - att.x, sy1 - att.y)),
+            min(hypot(sx1 - att.x, sy2 - att.y), hypot(sx2 - att.x, sy2 - att.y)));
+    }
 
-	bool is_hor(double att_x, double att_y) const {
-		double sx1 = stage_bottom_left[0] + 10;
-		double sx2 = sx1 + stage_width - 20;
-		return sx1 <= att_x && att_x <= sx2;
-	}
+    bool is_hor(double att_x, double att_y) const {
+        double sx1 = stage_bottom_left[0] + 10;
+        double sx2 = sx1 + stage_width - 20;
+        return sx1 <= att_x && att_x <= sx2;
+    }
 
-	bool is_ver(double att_x, double att_y) const {
-		double sy1 = stage_bottom_left[1] + 10;
-		double sy2 = sy1 + stage_height - 20;
-		return sy1 <= att_y && att_y <= sy2;
-	}
+    bool is_ver(double att_x, double att_y) const {
+        double sy1 = stage_bottom_left[1] + 10;
+        double sy2 = sy1 + stage_height - 20;
+        return sy1 <= att_y && att_y <= sy2;
+    }
 
-	Point project_to_stage(const Attendee &att) const {
-		const double R = 0.0;
-		double sx1 = stage_bottom_left[0] + 10;
-		double sx2 = sx1 + stage_width - 20;
-		double sy1 = stage_bottom_left[1] + 10;
-		double sy2 = sy1 + stage_height - 20;
-		if (sx1 <= att.x && att.x <= sx2) {
-			if (att.y < sy1) return { att.x, sy1 + R };
-			return { att.x, sy2 - R };
-		}
-		if (sy1 <= att.y && att.y <= sy2) {
-			if (att.x < sx1) return { sx1 + R, att.y };
-			return { sx2 - R, att.y };
-		}
-		if (att.x < sx1 && att.y < sy1) return { sx1 + R, sy1 + R };
-		if (att.x < sx1 && att.y > sy2) return { sx1 + R, sy2 - R };
-		if (att.x > sx2 && att.y < sy1) return { sx2 - R, sy1 + R };
-		return { sx2 - R, sy2 - R };
-	}
+    Point project_to_stage(const Attendee &att) const {
+        const double R = 0.0;
+        double sx1 = stage_bottom_left[0] + 10;
+        double sx2 = sx1 + stage_width - 20;
+        double sy1 = stage_bottom_left[1] + 10;
+        double sy2 = sy1 + stage_height - 20;
+        if (sx1 <= att.x && att.x <= sx2) {
+            if (att.y < sy1) return { att.x, sy1 + R };
+            return { att.x, sy2 - R };
+        }
+        if (sy1 <= att.y && att.y <= sy2) {
+            if (att.x < sx1) return { sx1 + R, att.y };
+            return { sx2 - R, att.y };
+        }
+        if (att.x < sx1 && att.y < sy1) return { sx1 + R, sy1 + R };
+        if (att.x < sx1 && att.y > sy2) return { sx1 + R, sy2 - R };
+        if (att.x > sx2 && att.y < sy1) return { sx2 - R, sy1 + R };
+        return { sx2 - R, sy2 - R };
+    }
 
-	bool is_valid_pos(double x, double y) const {
-		return x >= stage_bottom_left[0] + 10 && y >= stage_bottom_left[1] + 10 &&
-			x <= stage_bottom_left[0] + stage_width - 10 && y <= stage_bottom_left[1] + stage_height - 10;
-	}
+    bool is_valid_pos(double x, double y) const {
+        return x >= stage_bottom_left[0] + 10 && y >= stage_bottom_left[1] + 10 &&
+            x <= stage_bottom_left[0] + stage_width - 10 && y <= stage_bottom_left[1] + stage_height - 10;
+    }
 
-	FLD_BEGIN
-		FLD(room_width) FLD(room_height) FLD(stage_width) FLD(stage_height) FLD(stage_bottom_left)
-		FLD(musicians) FLD(attendees) FLD(pillars)
-	FLD_END
+    FLD_BEGIN
+        FLD(room_width) FLD(room_height) FLD(stage_width) FLD(stage_height) FLD(stage_bottom_left)
+        FLD(musicians) FLD(attendees) FLD(pillars)
+    FLD_END
 };
+
 
 struct Placement {
-	double x, y;
-	FLD_BEGIN FLD(x) FLD(y) FLD_END
-	bool operator < (const Placement &other) const {
-		return make_pair(x, y) < make_pair(other.x, other.y);
-	}
+    double x, y;
+    FLD_BEGIN FLD(x) FLD(y) FLD_END
+    bool operator < (const Placement &other) const {
+        return make_pair(x, y) < make_pair(other.x, other.y);
+    }
 };
 
+
 struct Solution {
-	vector<Placement> placements;
-	vector<double> volumes;
-	double score = -1;
-	int mask = -1;
-	FLD_BEGIN FLD(placements) FLD(score, -1) FLD(mask, -1) FLD(volumes, Json::Value(Json::arrayValue)) FLD_END
+    vector<Placement> placements;
+    vector<double> volumes;
+    double score = -1;
+    int mask = -1;
+    FLD_BEGIN FLD(placements) FLD(score, -1) FLD(mask, -1) FLD(volumes, Json::Value(Json::arrayValue)) FLD_END
 };
+
 
 struct T
 {
-	double x, y;
-	T( double _x=0., double _y=0.) { x=_x; y=_y; }
+    double x, y;
+    T( double _x=0., double _y=0.) { x=_x; y=_y; }
 };
+
 
 bool operator< (const T & a, const T & b)
 {
-	if (a.x != b.x) return a.x < b.x;
-	return a.y < b.y;
+    if (a.x != b.x) return a.x < b.x;
+    return a.y < b.y;
 }
+
 
 bool is_valid( const Problem & problem, const Solution & sol )
 {
-	int n = (int)problem.musicians.size();
-	if ((int)sol.placements.size() != n) return false;
-	double sx = problem.stage_bottom_left[0];
-	double sy = problem.stage_bottom_left[1];
-	for (int i=0; i<n; i++)
-	{
-		double x = sol.placements[i].x;
-		double y = sol.placements[i].y;
-		if (!(sx <= x - 10 && x + 10 <= sx+problem.stage_width && sy <= y - 10 && y + 10 <= sy+problem.stage_height))
-		{
-			fprintf(stderr, "mus %d is out of stage: (%.3f, %.3f)\n", i, x, y);
-			return false;
-		}
-		for (int j=i+1; j<n; j++)
-		{
-			double dx = x - sol.placements[j].x;
-			double dy = y - sol.placements[j].y;
-			if (dx*dx + dy*dy < 100.0) {
-				double dist = hypot(dx, dy);
-				fprintf(stderr, "mus %d and %d are too close: %.8f\n", i, j, dist);
-				return false;
-			}
-		}
-	}
-	return true;
+    int n = (int)problem.musicians.size();
+    if ((int)sol.placements.size() != n) return false;
+    double sx = problem.stage_bottom_left[0];
+    double sy = problem.stage_bottom_left[1];
+    for (int i=0; i<n; i++)
+    {
+        double x = sol.placements[i].x;
+        double y = sol.placements[i].y;
+        if (!(sx <= x - 10 && x + 10 <= sx+problem.stage_width && sy <= y - 10 && y + 10 <= sy+problem.stage_height))
+        {
+            fprintf(stderr, "mus %d is out of stage: (%.3f, %.3f)\n", i, x, y);
+            return false;
+        }
+        for (int j=i+1; j<n; j++)
+        {
+            double dx = x - sol.placements[j].x;
+            double dy = y - sol.placements[j].y;
+            if (dx*dx + dy*dy < 100.0) {
+                double dist = hypot(dx, dy);
+                fprintf(stderr, "mus %d and %d are too close: %.8f\n", i, j, dist);
+                return false;
+            }
+        }
+    }
+    return true;
 }
+
 
 bool is_blocked( T A, T B, T C, double R )
 {
-	//return false;
-	double dx1 = B.x - A.x, dy1 = B.y - A.y;
-	double dx2 = C.x - A.x, dy2 = C.y - A.y;
-	double cross1 = dx1*dx2 + dy1*dy2;
-	if (cross1 <= 0.) return false;
-	double dx3 = C.x - B.x, dy3 = C.y - B.y;
-	double cross2 = -dx1*dx3 - dy1*dy3;
-	if (cross2 <= 0.) return false;
-	double S = abs( dx1*dy2 - dx2*dy1 );
-	double d2 = dx1*dx1 + dy1*dy1;
-	// R => h = S / sqrt(d2)
-	// R*R => S*S / d2
-	return R*R*d2 >= S*S;
+    //return false;
+    double dx1 = B.x - A.x, dy1 = B.y - A.y;
+    double dx2 = C.x - A.x, dy2 = C.y - A.y;
+    double cross1 = dx1*dx2 + dy1*dy2;
+    if (cross1 <= 0.) return false;
+    double dx3 = C.x - B.x, dy3 = C.y - B.y;
+    double cross2 = -dx1*dx3 - dy1*dy3;
+    if (cross2 <= 0.) return false;
+    double S = abs( dx1*dy2 - dx2*dy1 );
+    double d2 = dx1*dx1 + dy1*dy1;
+    // R => h = S / sqrt(d2)
+    // R*R => S*S / d2
+    return R*R*d2 >= S*S;
 }
+
 
 vector< int > get_blocked_stupid( const Problem & problem, const Solution & sol, int mus_id )
 {
-	int n = (int)problem.musicians.size();
-	int m = (int)problem.attendees.size();
-	vector< int > res = vector< int >( m, 0 );
+    int n = (int)problem.musicians.size();
+    int m = (int)problem.attendees.size();
+    vector< int > res = vector< int >( m, 0 );
 
-	T A = T( sol.placements[mus_id].x, sol.placements[mus_id].y );
-	for (int i=0; i<m; i++)
-	{
-		T B = T( problem.attendees[i].x, problem.attendees[i].y );
-		for (int j=0; j<n; j++)
-			if (j != mus_id)
-			{
-				T C = T( sol.placements[j].x, sol.placements[j].y );
-				if (is_blocked( A, B, C, 5. ))
-				{
-					res[i] = 1;
-					break;
-				}
-			}
-	}
-	return res;
+    T A = T( sol.placements[mus_id].x, sol.placements[mus_id].y );
+    for (int i=0; i<m; i++)
+    {
+        T B = T( problem.attendees[i].x, problem.attendees[i].y );
+        for (int j=0; j<n; j++)
+            if (j != mus_id)
+            {
+                T C = T( sol.placements[j].x, sol.placements[j].y );
+                if (is_blocked( A, B, C, 5. ))
+                {
+                    res[i] = 1;
+                    break;
+                }
+            }
+    }
+    return res;
 }
+
 
 double pi = acos(-1.);
 
+
 vector< int > get_blocked( const Problem & problem, const Solution & sol, int mus_id )
 {
-	vector< pair< double, int > > vec; // < angle, id >
-	int n = (int)problem.musicians.size();
-	T A = T( sol.placements[mus_id].x, sol.placements[mus_id].y );
-	for (int i=0; i<n; i++)
-		if (i!=mus_id)
-		{
-			T B = T( sol.placements[i].x, sol.placements[i].y );
-			vec.push_back( make_pair( atan2( B.y-A.y, B.x-A.x ), i ) );
+    vector< pair< double, int > > vec; // < angle, id >
+    int n = (int)problem.musicians.size();
+    T A = T( sol.placements[mus_id].x, sol.placements[mus_id].y );
+    for (int i = 0; i < n; i++) {
+        if (i != mus_id) {
+            T B = T( sol.placements[i].x, sol.placements[i].y );
+            vec.push_back( make_pair( atan2( B.y-A.y, B.x-A.x ), i ) );
 		}
-	sort( vec.begin(), vec.end() );
+    }
+	sort(vec.begin(), vec.end());
 	int m = (int)problem.attendees.size();
 	vector< int > res = vector< int >( m, 0 );
 	for (int i=0; i<m; i++)
@@ -291,6 +305,7 @@ vector< int > get_blocked( const Problem & problem, const Solution & sol, int mu
 	return res;
 }
 
+
 vector< int > get_blocked2( const Problem & problem, const Solution & sol, int mus_id )
 {
 	int n = (int)problem.musicians.size();
@@ -304,7 +319,7 @@ vector< int > get_blocked2( const Problem & problem, const Solution & sol, int m
 			double dx = A.x - B.x, dy = A.y - B.y;
 			vecd.push_back( make_pair( dx*dx + dy*dy, i ) );
 		}
-	sort( vecd.begin(), vecd.end() );
+	sort(vecd.begin(), vecd.end());
 
 	vector< vector< pair< double, int > > > vec; // < angle, id >
 	double R = 9.;
@@ -317,7 +332,7 @@ vector< int > get_blocked2( const Problem & problem, const Solution & sol, int m
 		{
 			if (vec_cur.size()>0)
 			{
-				sort( vec_cur.begin(), vec_cur.end() );
+				sort(vec_cur.begin(), vec_cur.end());
 				vec.push_back( vec_cur );
 				vec_cur.clear();
 				max_angle.push_back( asin( 5./R ) + 0.0001 );
@@ -390,6 +405,7 @@ vector< int > get_blocked2( const Problem & problem, const Solution & sol, int m
 	return res;
 }
 
+
 vector< int > get_blocked3( const Problem & problem, const Solution & sol, int mus_id )
 {
 	vector< int > res = get_blocked2( problem, sol, mus_id );
@@ -413,6 +429,7 @@ vector< int > get_blocked3( const Problem & problem, const Solution & sol, int m
 		}
 	return res;
 }
+
 
 double get_score( const Problem & problem, const Solution & sol, bool optimistic)
 {
@@ -464,6 +481,7 @@ double get_score( const Problem & problem, const Solution & sol, bool optimistic
 	return score;
 }
 
+
 // [musician][attendee]
 vector<vector<int>> calc_visible(const Problem &p, const Solution &places) {
 	//cerr << "calc visible...";
@@ -482,6 +500,7 @@ vector<vector<int>> calc_visible(const Problem &p, const Solution &places) {
 	//cerr << "ok\n";
 	return res;
 }
+
 
 typedef double Weight;
 
@@ -591,6 +610,7 @@ Solution solve_assignment(const Problem &p, const Solution &places) {
 	return res;
 }
 
+
 bool can_place( const Solution & sol, double x, double y )
 {
 	for (int j=(int)sol.placements.size()-1; j>=0; j--)
@@ -602,6 +622,7 @@ bool can_place( const Solution & sol, double x, double y )
 	}
 	return true;
 }
+
 
 Solution get_regular_border_placement(const Problem & p, int mask = 15)
 {
@@ -650,6 +671,7 @@ Solution get_regular_border_placement(const Problem & p, int mask = 15)
 	return res;
 }
 
+
 struct Att
 {
 	double dist;
@@ -657,10 +679,12 @@ struct Att
 	int index;
 };
 
+
 bool le( const Att & a, const Att & b )
 {
 	return a.dist < b.dist;
 }
+
 
 Solution get_smart_regular_border_placement( const Problem & p, int mask = 15, double max_dist = 20. )
 {
@@ -686,7 +710,7 @@ Solution get_smart_regular_border_placement( const Problem & p, int mask = 15, d
 		}
 	}
 
-	sort( att.begin(), att.end(), le );
+	sort(att.begin(), att.end(), le);
 	Solution res;
 	res.mask = mask;
 	double shift = 18.;
@@ -761,6 +785,7 @@ Solution get_smart_regular_border_placement( const Problem & p, int mask = 15, d
 	}
 	return res;
 }
+
 
 Solution get_regular_two_row_border_placement(const Problem & p, int mask = 15, double step = 11.)
 {
@@ -844,6 +869,7 @@ Solution get_regular_two_row_border_placement(const Problem & p, int mask = 15, 
 	res.mask = mask;
 	return res;
 }
+
 
 Solution get_weird_border_placement(const Problem & p, int mask = 15, double step = 11.)
 {
@@ -960,6 +986,7 @@ Solution get_weird_border_placement(const Problem & p, int mask = 15, double ste
 	return res;
 }
 
+
 Solution get_border_placement(const Problem & p, int mask = 15, bool project = false)
 {
 	int n = (int)p.musicians.size();
@@ -1030,6 +1057,7 @@ Solution get_border_placement(const Problem & p, int mask = 15, bool project = f
 	return res;
 }
 
+
 Solution get_two_row_border_placement(const Problem & p, int mask = 15)
 {
 	int n = (int)p.musicians.size();
@@ -1078,6 +1106,7 @@ Solution get_two_row_border_placement(const Problem & p, int mask = 15)
 	return res;
 }
 
+
 Solution get_star_placement(const Problem & p)
 {
 	int rays = 3;
@@ -1118,6 +1147,7 @@ Solution get_star_placement(const Problem & p)
 	return res;
 }
 
+
 Solution get_random_placement(const Problem & p)
 {
 	//cerr << "get random placement\n";
@@ -1141,6 +1171,7 @@ Solution get_random_placement(const Problem & p)
 	return res;
 }
 
+
 Solution get_some_placement(const Problem &p) {
 	cerr << "get some placement\n";
 	int n = (int)p.musicians.size();
@@ -1162,6 +1193,7 @@ Solution get_some_placement(const Problem &p) {
 	return Solution();
 }
 
+
 void calc_tangent(Point p, Point c, double R, Point &tp) {
 	double d = p.to(c).len();
 	double t = Sqr(R) / d;
@@ -1170,6 +1202,7 @@ void calc_tangent(Point p, Point c, double R, Point &tp) {
 	double h = sqrt(R * R - t * t);
 	tp = p + v * (d - t) + u * h;
 }
+
 
 vector<Point> generate_offsets(double dist, int n, bool even) {
 	Point att = {0, dist};
@@ -1246,6 +1279,7 @@ vector<Point> generate_offsets(double dist, int n, bool even) {
 	return res;
 }
 
+
 vector<pair<Placement, bool>> generate_locations2(const Problem &p, double att_x, double att_y, int n, bool even) {
 	vector<pair<Placement, bool>> res;
 	if (p.is_hor(att_x, att_y)) {
@@ -1276,6 +1310,7 @@ vector<pair<Placement, bool>> generate_locations2(const Problem &p, double att_x
 	}
 	return res;
 }
+
 
 vector<Placement> generate_locations(const Problem &p, double att_x, double att_y, int n) {
 	vector<Placement> res;
@@ -1314,9 +1349,11 @@ vector<Placement> generate_locations(const Problem &p, double att_x, double att_
 	return res;
 }
 
+
 static double sqdist(double x0, double y0, double x1, double y1) {
 	return Sqr(x1-x0) + Sqr(y1-y0);
 }
+
 
 Solution get_assigned_placement(const Problem &p, bool &assigned, bool two_row, bool even, bool avg_taste, bool spec_pref) {
 	vector<tuple<double, Placement, int>> cands;
@@ -1420,6 +1457,7 @@ Solution get_assigned_placement(const Problem &p, bool &assigned, bool two_row, 
 	return res;
 }
 
+
 double get_dp_weight( const Problem & p, vector< pair< T, int > > & att, T t, T nei1, T nei2 )
 {
 	if (att.size()==0) return 0.;
@@ -1448,6 +1486,7 @@ double get_dp_weight( const Problem & p, vector< pair< T, int > > & att, T t, T 
 	}
 	return *max_element(w.begin(), w.end());
 }
+
 
 vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int dir, int cnt, int substeps, bool support_assign )
 {
@@ -1497,7 +1536,7 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 				(dir>=2 && sy+10. <= ay && ay <= sy+p.stage_height-10.) )
 				nearest.push_back( make_pair( p.dist_to_stage( p.attendees[a.second] ), a.second ) );
 		}
-		sort( nearest.begin(), nearest.end() );
+		sort(nearest.begin(), nearest.end());
 		nearest.resize( min( 100, (int)nearest.size() ) );
 		for (auto a : nearest)
 			for (int i=2; i<=5; i++)
@@ -1546,12 +1585,12 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 						//if (bunch.size()>0) cout << between[0].size() << " " << between[1].size() << "\n\n";
 						if (between[0].size() < 2) continue;
 						if (between[1].size() < 2) continue;
-						sort( between[0].begin(), between[0].end(),
+						sort(between[0].begin(), between[0].end(),
 							[]( const pair< T, bool > & a, const pair< T, bool > & b ) -> bool
-							{ return a.first.x < b.first.x; } );
-						sort( between[1].begin(), between[1].end(),
+							{ return a.first.x < b.first.x; });
+						sort(between[1].begin(), between[1].end(),
 							[]( const pair< T, bool > & a, const pair< T, bool > & b ) -> bool
-							{ return a.first.x < b.first.x; } );
+							{ return a.first.x < b.first.x; });
 					}
 					else
 					{
@@ -1565,12 +1604,12 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 						//cout << between[0].size() << " " << between[1].size() << "\n";
 						if (between[0].size() < 2) continue;
 						if (between[1].size() < 2) continue;
-						sort( between[0].begin(), between[0].end(),
+						sort(between[0].begin(), between[0].end(),
 							[]( const pair< T, bool > & a, const pair< T, bool > & b ) -> bool
-							{ return a.first.y < b.first.y; } );
-						sort( between[1].begin(), between[1].end(),
+							{ return a.first.y < b.first.y; });
+						sort(between[1].begin(), between[1].end(),
 							[]( const pair< T, bool > & a, const pair< T, bool > & b ) -> bool
-							{ return a.first.y < b.first.y; } );
+							{ return a.first.y < b.first.y; });
 					}
 
 					if (mi_pos < 0 || ma_pos >= k) continue;
@@ -1578,10 +1617,10 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 					double cost = 0.;
 					T nei1 = T( mi.x-ovec.x*5.-dvec.x*(5.+0.000001), mi.y-ovec.y*5.-dvec.y*(5.+0.000001) );
 					T nei2 = T( ma.x-ovec.x*5.+dvec.x*(5.-0.000001), ma.y-ovec.y*5.+dvec.y*(5.-0.000001) );
-					
+
 					cost += get_dp_weight( p, att, mi, nei1, between[0][0].first );
 					cost += get_dp_weight( p, att, ma, between[0][(int)between[0].size()-1].first, nei2 );
-					
+
 					for (int g=0; g<(int)between[0].size(); g++)
 					{
 						T L = (g==0 ? mi : between[0][g-1].first);
@@ -1635,7 +1674,6 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 			{
 				double delta = step*j*0.5;
 				double delta2 = delta - (delta-5.);
-				double dd = min( delta2, delta*2-delta2 );
 				double shift = sqrt( max( 0., 100. - delta*delta ) ) + 0.00001;
 				T cc = T( cur.x + 0.5*(next.x-cur.x)*delta2/delta, cur.y + 0.5*(next.y-cur.y)*delta2/delta );
 				m1 = T( cc.x + ovec.x*shift, cc.y + ovec.y*shift );
@@ -1643,7 +1681,6 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 			{
 				double delta = step*j*0.5;
 				double delta2 = delta + (delta-5.);
-				double dd = min( delta2, delta*2-delta2 );
 				double shift = sqrt( max( 0., 100. - delta*delta ) ) + 0.00001;
 				T cc = T( cur.x + 0.5*(next.x-cur.x)*delta2/delta, cur.y + 0.5*(next.y-cur.y)*delta2/delta );
 				m2 = T( cc.x + ovec.x*shift, cc.y + ovec.y*shift );
@@ -1775,6 +1812,7 @@ vector< pair< double, T > > get_dp_dir_border_placement( const Problem & p, int 
 	return res;
 }
 
+
 Solution get_dp_border_placement( const Problem & p, int mask, int cnt, int substeps, bool support_assign )
 {
 	int n = (int)p.musicians.size();
@@ -1787,11 +1825,11 @@ Solution get_dp_border_placement( const Problem & p, int mask, int cnt, int subs
 			for (auto t : tmp)
 				tmp_res.push_back( t );
 		}
-	sort( tmp_res.begin(), tmp_res.end() );
+	sort(tmp_res.begin(), tmp_res.end());
 	reverse( tmp_res.begin(), tmp_res.end() );
 	Solution res;
 	for (auto x : tmp_res)
-		if( can_place( res, x.second.x, x.second.y ) )
+		if (can_place(res, x.second.x, x.second.y))
 		{
 			res.placements.push_back( { x.second.x, x.second.y } );
 			if ((int)res.placements.size()==n) return res;
@@ -1808,6 +1846,7 @@ Solution get_dp_border_placement( const Problem & p, int mask, int cnt, int subs
 
 	return res;
 }
+
 
 Solution get_compact_placement(const Problem &p, int xmode = 0, int ymode = 0) {
 	int n = (int)p.musicians.size();
@@ -1873,6 +1912,7 @@ Solution get_spiral_placement(const Problem &p, int iter) {
 	return res;
 }
 
+
 Solution get_normal_placement(const Problem &p) {
 	const int n = (int)p.musicians.size();
 	const double sx = p.stage_bottom_left[0];
@@ -1915,7 +1955,9 @@ Solution get_normal_placement(const Problem &p) {
 	return res;
 }
 
-vector<double> get_mus_scores( const Problem & problem, const Solution & sol );
+
+vector<double> get_mus_scores(const Problem & problem, const Solution & sol);
+
 
 void writeSolution(const Problem &p, const Solution &sol_orig, string fname) {
 	//auto f = fopen(format("../答/%d/%s.solution", problem_id, tag).c_str(), "wt");
@@ -1936,11 +1978,13 @@ void writeSolution(const Problem &p, const Solution &sol_orig, string fname) {
 	}
 }
 
+
 inline double score_f_no_ceil(double x1, double y1, double x2, double y2, double taste) {
 	double d2 = Sqr(x1 - x2) + Sqr(y1 - y2);
 	double tmp = 1'000'000 * taste;
 	return tmp / d2;
 }
+
 
 Solution wiggle(const Problem &p, const Solution &sol) {
 	auto visible = calc_visible(p, sol);
@@ -2037,6 +2081,7 @@ Solution wiggle(const Problem &p, const Solution &sol) {
 	return res;
 }
 
+
 vector<double> get_mus_scores( const Problem & problem, const Solution & sol )
 {
 	int n = (int)problem.musicians.size();
@@ -2063,6 +2108,7 @@ vector<double> get_mus_scores( const Problem & problem, const Solution & sol )
 	}
 	return mus_scores;
 }
+
 
 Solution wiggle_together(const Problem &p, const Solution &sol) {
 	if (!new_scoring) return sol;
@@ -2191,6 +2237,7 @@ inline double score_f(double x1, double y1, double x2, double y2, double taste) 
 	return ceil(tmp / d2);
 }
 
+
 void print_stats(const Problem &p) {
 	double cx = p.stage_bottom_left[0] + 0.5 * p.stage_width;
 	double cy = p.stage_bottom_left[1] + 0.5 * p.stage_height;
@@ -2203,6 +2250,7 @@ void print_stats(const Problem &p) {
 		printf("%d: %.0f\n", i, score);
 	}
 }
+
 
 vector<double> get_instrument_scores(const Problem &p) {
 	double cx = p.stage_bottom_left[0] + 0.5 * p.stage_width;
@@ -2219,6 +2267,7 @@ vector<double> get_instrument_scores(const Problem &p) {
 	return res;
 }
 
+
 void solve(const string &infile, int timeout, int wiggles, const string &solver, const string &fname, ArgParser &args) {
 	Json::Value root, root_s;
 	Problem p;
@@ -2233,7 +2282,6 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 
 	fprintf(stderr, "input %s, solver %s, %d musicians, %d attendees, %.0lf x %.0lf\n", infile.c_str(), solver.c_str(), (int)p.musicians.size(), (int)p.attendees.size(), p.room_width, p.room_height );
 
-
 	if (false) {
 		int idx = timeout;
 		int m = (int)p.attendees.size();
@@ -2247,7 +2295,6 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 		}
 		return;
 	}
-
 
 	double best_score = 0.;
 	int iters = 0;
@@ -2412,6 +2459,7 @@ void solve(const string &infile, int timeout, int wiggles, const string &solver,
 	cerr << "clock " << clock() << "\n";
 }
 
+
 void investigation()
 {
 	freopen( "output.txt", "w", stdout );
@@ -2421,6 +2469,7 @@ void investigation()
 		cout << d << " " << cover << "\n";
 	}
 }
+
 
 int main(int argc, char *argv[]) {
 

@@ -65,12 +65,12 @@ bool readJsonFile(const char *fname, Json::Value &v);
 bool readJsonString(const char *s, Json::Value &v);
 
 #define FLD_BEGIN \
-	template<typename T2> friend struct SerializerAccess; \
-	Json::Value _serialize(SerializationContext *ctx) { Json::Value res; _enumerate(Serializer(res, ctx)); return res; } \
-	bool _deserialize(const Json::Value &data, DeserializationContext *ctx) { Deserializer x = Deserializer(data, ctx); _enumerate(x); return x.result; } \
-	void _apply_diff(const Json::Value &data) { _enumerate(DiffApplier(data)); } \
-	template<typename F> Json::Value _get_diff(F &other) { Json::Value res; DiffComputer dc(this, &other, res); _enumerate(dc); return res; } \
-	template<typename F> void _enumerate(F &&f) {
+    template<typename T2> friend struct SerializerAccess; \
+    Json::Value _serialize(SerializationContext *ctx) { Json::Value res; _enumerate(Serializer(res, ctx)); return res; } \
+    bool _deserialize(const Json::Value &data, DeserializationContext *ctx) { Deserializer x = Deserializer(data, ctx); _enumerate(x); return x.result; } \
+    void _apply_diff(const Json::Value &data) { _enumerate(DiffApplier(data)); } \
+    template<typename F> Json::Value _get_diff(F &other) { Json::Value res; DiffComputer dc(this, &other, res); _enumerate(dc); return res; } \
+    template<typename F> void _enumerate(F &&f) {
 
 #define FLD_END }
 #define FLD(fld, ...) f(#fld, fld, ##__VA_ARGS__);
@@ -80,52 +80,52 @@ bool readJsonString(const char *s, Json::Value &v);
 
 struct IteratorSerializer
 {
-	virtual int getId(const void *it) = 0;
-	virtual ~IteratorSerializer() {}
+    virtual int getId(const void *it) = 0;
+    virtual ~IteratorSerializer() {}
 };
 
 struct SerializationContext
 {
-	std::unordered_map<std::string, int> type_ids;
-	std::unordered_map<int, Json::Value> free_objects;
-	std::unordered_map<const void*, int> object_ids;
-	std::unordered_set<const void*> serialized_objs;
-	std::unordered_map<const void*, IteratorSerializer*> iterator_serializers;
-	bool is_free = false; // true means we are currently serializing a free object
+    std::unordered_map<std::string, int> type_ids;
+    std::unordered_map<int, Json::Value> free_objects;
+    std::unordered_map<const void*, int> object_ids;
+    std::unordered_set<const void*> serialized_objs;
+    std::unordered_map<const void*, IteratorSerializer*> iterator_serializers;
+    bool is_free = false; // true means we are currently serializing a free object
 
-	Json::Value getConsolidatedJson(const Json::Value &data) const;
-	~SerializationContext()
-	{
-		for (auto t : iterator_serializers) delete t.second;
-	}
+    Json::Value getConsolidatedJson(const Json::Value &data) const;
+    ~SerializationContext()
+    {
+        for (auto t : iterator_serializers) delete t.second;
+    }
 };
 
 struct IteratorDeserializer
 {
-	virtual bool resolve(int id, void *it) = 0;
-	virtual ~IteratorDeserializer() {}
+    virtual bool resolve(int id, void *it) = 0;
+    virtual ~IteratorDeserializer() {}
 };
 
 struct DeserializationContext
 {
-	DeserializationContext(const Json::Value &type_id_data, const Json::Value &free_object_data);
-	bool finalize();
+    DeserializationContext(const Json::Value &type_id_data, const Json::Value &free_object_data);
+    bool finalize();
 
-	std::unordered_map<int, std::string> type_ids;
-	std::unordered_map<int, Json::Value> free_objects;
-	std::unordered_map<int, void*> object_ptrs;
-	std::vector<std::pair<void **, int>> patch_list;
-	std::unordered_map<void*, IteratorDeserializer*> iterator_deserializers;
-	std::vector<std::tuple<IteratorDeserializer*, void*, int>> iterator_patch_list; // container, iterator, id
-	std::vector<std::string> error_stack;
-	~DeserializationContext()
-	{
-		for (auto t : iterator_deserializers) delete t.second;
-	}
-	static DeserializationContext Empty() { return {}; }
-	std::string getErrorMessage() const;
+    std::unordered_map<int, std::string> type_ids;
+    std::unordered_map<int, Json::Value> free_objects;
+    std::unordered_map<int, void*> object_ptrs;
+    std::vector<std::pair<void **, int>> patch_list;
+    std::unordered_map<void*, IteratorDeserializer*> iterator_deserializers;
+    std::vector<std::tuple<IteratorDeserializer*, void*, int>> iterator_patch_list; // container, iterator, id
+    std::vector<std::string> error_stack;
+    ~DeserializationContext()
+    {
+        for (auto t : iterator_deserializers) delete t.second;
+    }
+    static DeserializationContext Empty() { return {}; }
+    std::string getErrorMessage() const;
 private:
-	DeserializationContext() {}
+    DeserializationContext() {}
 };
 
 const char * getJSONType(const Json::Value & val);
@@ -133,7 +133,7 @@ const char * getJSONType(const Json::Value & val);
 class e_unregistered_class : public std::runtime_error
 {
 public:
-	e_unregistered_class(const char *name) : std::runtime_error(name) {}
+    e_unregistered_class(const char *name) : std::runtime_error(name) {}
 };
 
 class e_unresolved_pointer : public std::exception
@@ -154,160 +154,160 @@ class e_unsupported_get_diff : public std::exception
 
 struct Factory
 {
-	typedef std::function<void*()> constr_f;
-	typedef std::function<Json::Value(void*, SerializationContext*)> serialize_f;
-	typedef std::function<bool(void*, const Json::Value&, DeserializationContext*)> deserialize_f;
-	struct FactoryEntry
-	{
-		constr_f constr;
-		serialize_f serialize;
-		deserialize_f deserialize;
-	};
-	void registerClass(const char *name, constr_f f, serialize_f f2, deserialize_f f3)
-	{
-		typemap[name] = { f, f2, f3 };
-	}
-	FactoryEntry getData(const char *name)
-	{
-		auto it = typemap.find(name);
-		if (it == typemap.end()) throw e_unregistered_class(name);
-		return it->second;
-	}
+    typedef std::function<void*()> constr_f;
+    typedef std::function<Json::Value(void*, SerializationContext*)> serialize_f;
+    typedef std::function<bool(void*, const Json::Value&, DeserializationContext*)> deserialize_f;
+    struct FactoryEntry
+    {
+        constr_f constr;
+        serialize_f serialize;
+        deserialize_f deserialize;
+    };
+    void registerClass(const char *name, constr_f f, serialize_f f2, deserialize_f f3)
+    {
+        typemap[name] = { f, f2, f3 };
+    }
+    FactoryEntry getData(const char *name)
+    {
+        auto it = typemap.find(name);
+        if (it == typemap.end()) throw e_unregistered_class(name);
+        return it->second;
+    }
 private:
-	std::unordered_map<std::string, FactoryEntry> typemap;
+    std::unordered_map<std::string, FactoryEntry> typemap;
 };
 
 extern Factory &factory;
 
 static struct FactoryInitializer {
-	FactoryInitializer();
-	~FactoryInitializer();
+    FactoryInitializer();
+    ~FactoryInitializer();
 } _factoryInitializer; // static initializer for every translation unit
 
 struct SerializationToken
 {
 private:
-	SerializationToken() {}
-	template<typename T> friend struct SerializerAccess;
+    SerializationToken() {}
+    template<typename T> friend struct SerializerAccess;
 };
 
 template<typename T>
 struct is_tracked
 {
-	enum { value = std::is_polymorphic<T>::value };
+    enum { value = std::is_polymorphic<T>::value };
 };
 
 #define SER_TRACKED(ty) \
 template<> struct is_tracked<ty> \
 { \
-	enum { value = true }; \
+    enum { value = true }; \
 };
 
 template<bool>
 struct TrackObject
 {
-	template<typename T> std::pair<Json::Value, int> operator()(const T &f, SerializationContext *ctx) const
-	{
-		return{ {}, -1 };
-	}
+    template<typename T> std::pair<Json::Value, int> operator()(const T &f, SerializationContext *ctx) const
+    {
+        return{ {}, -1 };
+    }
 };
 
 template<>
 struct TrackObject<true>
 {
-	template<typename T> std::pair<Json::Value, int> operator()(const T &f, SerializationContext *ctx) const
-	{
-		auto id_it = ctx->object_ids.find((const void*)&f);
-		int id;
-		if (id_it != ctx->object_ids.end())
-		{
-			auto s_it = ctx->serialized_objs.find((const void*)&f);
-			if (s_it != ctx->serialized_objs.end())
-			{
-				// already serialized!
-				auto it = ctx->free_objects.find(id_it->second);
-				assert(it != ctx->free_objects.end());
-				auto res = it->second;
-				ctx->free_objects.erase(it);
-				return{ res, -1 };
-			}
-			id = id_it->second;
-		}
-		else
-		{
-			id = (int)ctx->object_ids.size();
-		}
-		ctx->serialized_objs.insert((const void*)&f);
-		ctx->object_ids[(const void*)&f] = id;
-		return{ {}, id };
-	}
+    template<typename T> std::pair<Json::Value, int> operator()(const T &f, SerializationContext *ctx) const
+    {
+        auto id_it = ctx->object_ids.find((const void*)&f);
+        int id;
+        if (id_it != ctx->object_ids.end())
+        {
+            auto s_it = ctx->serialized_objs.find((const void*)&f);
+            if (s_it != ctx->serialized_objs.end())
+            {
+                // already serialized!
+                auto it = ctx->free_objects.find(id_it->second);
+                assert(it != ctx->free_objects.end());
+                auto res = it->second;
+                ctx->free_objects.erase(it);
+                return{ res, -1 };
+            }
+            id = id_it->second;
+        }
+        else
+        {
+            id = (int)ctx->object_ids.size();
+        }
+        ctx->serialized_objs.insert((const void*)&f);
+        ctx->object_ids[(const void*)&f] = id;
+        return{ {}, id };
+    }
 };
 
 template<bool>
 struct AddObjectType
 {
-	template<typename T> int operator()(const T &f, SerializationContext *ctx) const
-	{
-		return -1;
-	}
+    template<typename T> int operator()(const T &f, SerializationContext *ctx) const
+    {
+        return -1;
+    }
 };
 
 template<>
 struct AddObjectType<true>
 {
-	template<typename T> int operator()(const T &f, SerializationContext *ctx) const
-	{
-		std::string tid = typeid(f).name();
-		auto it = ctx->type_ids.find(tid);
-		if (it != ctx->type_ids.end()) return it->second;
-		int id = (int)ctx->type_ids.size();
-		ctx->type_ids[tid] = id;
-		return id;
-	}
+    template<typename T> int operator()(const T &f, SerializationContext *ctx) const
+    {
+        std::string tid = typeid(f).name();
+        auto it = ctx->type_ids.find(tid);
+        if (it != ctx->type_ids.end()) return it->second;
+        int id = (int)ctx->type_ids.size();
+        ctx->type_ids[tid] = id;
+        return id;
+    }
 };
 
 template<bool> struct ApplyDiffCaller
 {
-	template<typename T>
-	void operator()(T &f, const Json::Value &data) const
-	{
-		throw e_unsupported_apply_diff();
-	}
+    template<typename T>
+    void operator()(T &f, const Json::Value &data) const
+    {
+        throw e_unsupported_apply_diff();
+    }
 };
 
 template<> struct ApplyDiffCaller<true>
 {
-	template<typename T>
-	void operator()(T &f, const Json::Value &data) const
-	{
-		// todo: use SerializeAccess
-		f._apply_diff(data);
-	}
+    template<typename T>
+    void operator()(T &f, const Json::Value &data) const
+    {
+        // todo: use SerializeAccess
+        f._apply_diff(data);
+    }
 };
 
 template <typename T>
 class has_apply_diff
 {
-	typedef char one;
-	typedef long two;
+    typedef char one;
+    typedef long two;
 
-	template <typename C> static one test(decltype(&C::_apply_diff));
-	template <typename C> static two test(...);
+    template <typename C> static one test(decltype(&C::_apply_diff));
+    template <typename C> static two test(...);
 
 public:
-	enum { value = sizeof(test<T>(0)) == sizeof(char) };
+    enum { value = sizeof(test<T>(0)) == sizeof(char) };
 };
 
 template<typename T>
 void applyJsonDiff(T &f, const Json::Value &data) {
-	ApplyDiffCaller<has_apply_diff<T>::value>()(f, data);
+    ApplyDiffCaller<has_apply_diff<T>::value>()(f, data);
 }
 
 template<typename T>
 Json::Value getJsonDiff(T &old, T &cur)
 {
-	Json::Value t = old._get_diff(cur);
-	return t;
+    Json::Value t = old._get_diff(cur);
+    return t;
 }
 
 #ifdef VERBOSE_DESERIALIER
@@ -335,294 +335,294 @@ return false; \
 #endif // VERBOSE_DESERIALIER
 
 #define SERIALIZABLE_ENUM(ty) \
-	template<> \
-	inline bool deserializeJson(ty &f, const Json::Value &data, DeserializationContext *ctx) \
-	{ \
-		if (!data.isIntegral()) JSON_FAIL_TY(data, ctx, "integral"); \
-		f = static_cast<ty>(data.asInt()); \
-		return true; \
-	} \
-	template<> \
-	inline Json::Value serializeJson(const ty &f, SerializationContext *ctx) { \
-		return Json::Value(static_cast<i32>(f)); \
-	} \
-	template<> \
-	inline void applyJsonDiff(ty &f, const Json::Value &data) \
-	{ \
-		deserializeJson(f, data); \
-	} \
-	template<> \
-	inline Json::Value getJsonDiff(ty &x1, ty &x2) \
-	{\
-		if (x1 == x2) return Json::Value(); \
-		return serializeJson(x2); \
-	}
+    template<> \
+    inline bool deserializeJson(ty &f, const Json::Value &data, DeserializationContext *ctx) \
+    { \
+        if (!data.isIntegral()) JSON_FAIL_TY(data, ctx, "integral"); \
+        f = static_cast<ty>(data.asInt()); \
+        return true; \
+    } \
+    template<> \
+    inline Json::Value serializeJson(const ty &f, SerializationContext *ctx) { \
+        return Json::Value(static_cast<i32>(f)); \
+    } \
+    template<> \
+    inline void applyJsonDiff(ty &f, const Json::Value &data) \
+    { \
+        deserializeJson(f, data); \
+    } \
+    template<> \
+    inline Json::Value getJsonDiff(ty &x1, ty &x2) \
+    {\
+        if (x1 == x2) return Json::Value(); \
+        return serializeJson(x2); \
+    }
 
-	template<bool>
-	struct StorePointer
-	{
-		template<typename T> bool operator()(T &f, const Json::Value &data, DeserializationContext *ctx) const
-		{
-			return true;
-		}
-	};
+    template<bool>
+    struct StorePointer
+    {
+        template<typename T> bool operator()(T &f, const Json::Value &data, DeserializationContext *ctx) const
+        {
+            return true;
+        }
+    };
 
-	template<>
-	struct StorePointer<true>
-	{
-		template<typename T> bool operator()(T &f, const Json::Value &data, DeserializationContext *ctx) const
-		{
-			if (!ctx) return true;
-			if (!data.isObject()) return false;
-			auto t = data.get("_id_", Json::Value());
-			if (!t.isIntegral()) return false;
-			int id = t.asInt();
-			assert(ctx->object_ptrs.find(id) == ctx->object_ptrs.end());
-			ctx->object_ptrs[id] = &f;
-			return true;
-		}
-	};
+    template<>
+    struct StorePointer<true>
+    {
+        template<typename T> bool operator()(T &f, const Json::Value &data, DeserializationContext *ctx) const
+        {
+            if (!ctx) return true;
+            if (!data.isObject()) return false;
+            auto t = data.get("_id_", Json::Value());
+            if (!t.isIntegral()) return false;
+            int id = t.asInt();
+            assert(ctx->object_ptrs.find(id) == ctx->object_ptrs.end());
+            ctx->object_ptrs[id] = &f;
+            return true;
+        }
+    };
 
-	struct DefaultAccess {};
+    struct DefaultAccess {};
 
-	template<typename T2>
-	struct SerializerAccess
-	{
-		template<typename T>
-		static bool Deserialize(T &f, const Json::Value &data, DeserializationContext *ctx)
-		{
-			return f._deserialize(data, ctx);
-		}
-		template<typename T>
-		static Json::Value Serialize(const T &f, SerializationContext *ctx)
-		{
-			return const_cast<T&>(f)._serialize(ctx);
-		}
-		template<typename T, typename F>
-		static void Enumerate(T *obj, F &&f)
-		{
-			obj->_enumerate(f);
-		}
-		template<typename T>
-		static T Construct(typename std::enable_if<std::is_constructible<T>::value>::type* = nullptr)
-		{
-			return T();
-		}
-		template<typename T>
-		static T Construct(typename std::enable_if<!std::is_constructible<T>::value>::type* = nullptr)
-		{
-			return T(SerializationToken());
-		}
-		template<typename T>
-		static T* ConstructNew(typename std::enable_if<std::is_constructible<T>::value>::type* = nullptr)
-		{
-			return new T();
-		}
-		template<typename T>
-		static T* ConstructNew(typename std::enable_if<std::is_abstract<T>::value>::type* = nullptr)
-		{
-			assert(false);
-			return nullptr; // cannot instantiate abstract class
-		}
-		template<typename T>
-		static T* ConstructNew(typename std::enable_if<!std::is_constructible<T>::value && !std::is_abstract<T>::value>::type* = nullptr)
-		{
-			return new T(SerializationToken());
-		}
-	};
+    template<typename T2>
+    struct SerializerAccess
+    {
+        template<typename T>
+        static bool Deserialize(T &f, const Json::Value &data, DeserializationContext *ctx)
+        {
+            return f._deserialize(data, ctx);
+        }
+        template<typename T>
+        static Json::Value Serialize(const T &f, SerializationContext *ctx)
+        {
+            return const_cast<T&>(f)._serialize(ctx);
+        }
+        template<typename T, typename F>
+        static void Enumerate(T *obj, F &&f)
+        {
+            obj->_enumerate(f);
+        }
+        template<typename T>
+        static T Construct(typename std::enable_if<std::is_constructible<T>::value>::type* = nullptr)
+        {
+            return T();
+        }
+        template<typename T>
+        static T Construct(typename std::enable_if<!std::is_constructible<T>::value>::type* = nullptr)
+        {
+            return T(SerializationToken());
+        }
+        template<typename T>
+        static T* ConstructNew(typename std::enable_if<std::is_constructible<T>::value>::type* = nullptr)
+        {
+            return new T();
+        }
+        template<typename T>
+        static T* ConstructNew(typename std::enable_if<std::is_abstract<T>::value>::type* = nullptr)
+        {
+            assert(false);
+            return nullptr; // cannot instantiate abstract class
+        }
+        template<typename T>
+        static T* ConstructNew(typename std::enable_if<!std::is_constructible<T>::value && !std::is_abstract<T>::value>::type* = nullptr)
+        {
+            return new T(SerializationToken());
+        }
+    };
 
-	typedef SerializerAccess<DefaultAccess> SerializerAccessD;
+    typedef SerializerAccess<DefaultAccess> SerializerAccessD;
 
-	template<typename T>
-	struct ConstructHelper
-	{
-		static T Construct() { return SerializerAccessD::Construct<T>(); }
-	};
+    template<typename T>
+    struct ConstructHelper
+    {
+        static T Construct() { return SerializerAccessD::Construct<T>(); }
+    };
 
-	template<bool>
-	struct CallSerialize
-	{
-		template<typename T> Json::Value operator()(const T &f, SerializationContext *ctx) const
-		{
-			return SerializerAccessD::Serialize(f, ctx);
-		}
-	};
+    template<bool>
+    struct CallSerialize
+    {
+        template<typename T> Json::Value operator()(const T &f, SerializationContext *ctx) const
+        {
+            return SerializerAccessD::Serialize(f, ctx);
+        }
+    };
 
-	template<>
-	struct CallSerialize<true>
-	{
-		template<typename T> Json::Value operator()(const T &f, SerializationContext *ctx) const
-		{
-			return factory.getData(typeid(f).name()).serialize(&const_cast<T&>(f), ctx);
-		}
-	};
+    template<>
+    struct CallSerialize<true>
+    {
+        template<typename T> Json::Value operator()(const T &f, SerializationContext *ctx) const
+        {
+            return factory.getData(typeid(f).name()).serialize(&const_cast<T&>(f), ctx);
+        }
+    };
 
-	template<typename T1, typename T2>
-	struct ConstructHelper<std::pair<T1, T2>>
-	{
-		static std::pair<T1, T2> Construct()
-		{
-			return { ConstructHelper<T1>::Construct(), ConstructHelper<T2>::Construct() };
-		}
-	};
+    template<typename T1, typename T2>
+    struct ConstructHelper<std::pair<T1, T2>>
+    {
+        static std::pair<T1, T2> Construct()
+        {
+            return { ConstructHelper<T1>::Construct(), ConstructHelper<T2>::Construct() };
+        }
+    };
 
-	template<typename T>
-	Json::Value serializeJson(const T &f, SerializationContext *ctx = nullptr)
-	{
-		int id = -1, tid = -1;
-		if (ctx)
-		{
-			if (!ctx->is_free)
-			{
-				auto t = TrackObject<is_tracked<T>::value>()(f, ctx);
-				if (!t.first.isNull()) return t.first;
-				id = t.second;
-			}
-			else
-			{
-				tid = AddObjectType<std::is_polymorphic<T>::value>()(f, ctx);
-			}
-			ctx->is_free = false;
-		}
-		Json::Value r = CallSerialize<std::is_polymorphic<T>::value>()(f, ctx);
-		if (id >= 0) r["_id_"] = id;
-		if (tid >= 0) r["_tid_"] = tid;
-		return r;
-	}
+    template<typename T>
+    Json::Value serializeJson(const T &f, SerializationContext *ctx = nullptr)
+    {
+        int id = -1, tid = -1;
+        if (ctx)
+        {
+            if (!ctx->is_free)
+            {
+                auto t = TrackObject<is_tracked<T>::value>()(f, ctx);
+                if (!t.first.isNull()) return t.first;
+                id = t.second;
+            }
+            else
+            {
+                tid = AddObjectType<std::is_polymorphic<T>::value>()(f, ctx);
+            }
+            ctx->is_free = false;
+        }
+        Json::Value r = CallSerialize<std::is_polymorphic<T>::value>()(f, ctx);
+        if (id >= 0) r["_id_"] = id;
+        if (tid >= 0) r["_tid_"] = tid;
+        return r;
+    }
 
-	template<typename T>
-	Json::Value serializeJson(const std::vector<T> &f, SerializationContext *ctx = nullptr)
-	{
-		Json::Value res;
-		res.resize(f.size());
-		for (u32 i = 0; i < f.size(); i++)
-			res[i] = serializeJson(f[i], ctx);
-		return res;
-	}
+    template<typename T>
+    Json::Value serializeJson(const std::vector<T> &f, SerializationContext *ctx = nullptr)
+    {
+        Json::Value res;
+        res.resize(f.size());
+        for (u32 i = 0; i < f.size(); i++)
+            res[i] = serializeJson(f[i], ctx);
+        return res;
+    }
 
-	template<typename T, size_t sz>
-	Json::Value serializeJson(const std::array<T, sz> &f, SerializationContext *ctx = nullptr)
-	{
-		Json::Value res;
-		res.resize(sz);
-		for (u32 i = 0; i < sz; i++)
-			res[i] = serializeJson(f[i], ctx);
-		return res;
-	}
+    template<typename T, size_t sz>
+    Json::Value serializeJson(const std::array<T, sz> &f, SerializationContext *ctx = nullptr)
+    {
+        Json::Value res;
+        res.resize(sz);
+        for (u32 i = 0; i < sz; i++)
+            res[i] = serializeJson(f[i], ctx);
+        return res;
+    }
 
 template<typename T>
 struct ClassRegistrator
 {
-	ClassRegistrator()
-	{
-		factory.registerClass(typeid(T).name(),
-			[]() { return (void *)SerializerAccessD::ConstructNew<T>(); },
-			[](void *p, SerializationContext *ctx) -> Json::Value
-				{ return SerializerAccessD::Serialize<T>(*reinterpret_cast<T*>(p), ctx); },
-			[](void *p, const Json::Value &data, DeserializationContext *ctx) -> bool
-				{ return SerializerAccessD::Deserialize<T>(*reinterpret_cast<T*>(p), data, ctx); }
-		);
-	}
+    ClassRegistrator()
+    {
+        factory.registerClass(typeid(T).name(),
+            []() { return (void *)SerializerAccessD::ConstructNew<T>(); },
+            [](void *p, SerializationContext *ctx) -> Json::Value
+                { return SerializerAccessD::Serialize<T>(*reinterpret_cast<T*>(p), ctx); },
+            [](void *p, const Json::Value &data, DeserializationContext *ctx) -> bool
+                { return SerializerAccessD::Deserialize<T>(*reinterpret_cast<T*>(p), data, ctx); }
+        );
+    }
 };
 
 template<typename T>
 class ClassRegistratorWrapper
 {
-	static ClassRegistrator<T> data;
+    static ClassRegistrator<T> data;
 public:
-	ClassRegistratorWrapper() {
-		// this is necessary for data to be instantiated
-		(void)data;
-	}
+    ClassRegistratorWrapper() {
+        // this is necessary for data to be instantiated
+        (void)data;
+    }
 };
 
 template<typename T> ClassRegistrator<T> ClassRegistratorWrapper<T>::data;
 
 #define REGISTER_CLASS(T) static ClassRegistratorWrapper<T> _register_##T;
 
-	template<typename T>
-	bool deserializeJson(T &f, const Json::Value &data, DeserializationContext *ctx = nullptr)
-	{
-		if (!StorePointer<is_tracked<T>::value>()(f, data, ctx)) JSON_FAIL(ctx, "StorePointer failed");
-		return SerializerAccessD::Deserialize(f, data, ctx);
-	}
+    template<typename T>
+    bool deserializeJson(T &f, const Json::Value &data, DeserializationContext *ctx = nullptr)
+    {
+        if (!StorePointer<is_tracked<T>::value>()(f, data, ctx)) JSON_FAIL(ctx, "StorePointer failed");
+        return SerializerAccessD::Deserialize(f, data, ctx);
+    }
 
-	template<typename T>
-	bool deserializeJson(std::vector<T> &f, const Json::Value &data, DeserializationContext *ctx = nullptr)
-	{
-		if (!data.isArray()) JSON_FAIL_TY(data, ctx, "array");
-		u32 n = data.size();
-		f.clear();
-		f.reserve(n);
-		for (u32 i = 0; i < n; i++)
-		{
-			auto item = ConstructHelper<T>::Construct();
-			f.push_back(std::move(item));
-			if (!deserializeJson(f.back(), data[i], ctx))
-				JSON_FAIL_F(ctx, "index %u", i);
-		}
-		return true;
-	}
+    template<typename T>
+    bool deserializeJson(std::vector<T> &f, const Json::Value &data, DeserializationContext *ctx = nullptr)
+    {
+        if (!data.isArray()) JSON_FAIL_TY(data, ctx, "array");
+        u32 n = data.size();
+        f.clear();
+        f.reserve(n);
+        for (u32 i = 0; i < n; i++)
+        {
+            auto item = ConstructHelper<T>::Construct();
+            f.push_back(std::move(item));
+            if (!deserializeJson(f.back(), data[i], ctx))
+                JSON_FAIL_F(ctx, "index %u", i);
+        }
+        return true;
+    }
 
-	template<typename T, size_t sz>
-	bool deserializeJson(std::array<T, sz> &f, const Json::Value &data, DeserializationContext *ctx = nullptr)
-	{
-		if (!data.isArray()) JSON_FAIL_TY(data, ctx, "array");
-		if (data.size() != sz) JSON_FAIL_F(ctx, "wrong size: expected %u, got %u", sz, data.size());
-		for (u32 i = 0; i < sz; i++)
-			if (!deserializeJson(f[i], data[i], ctx))
-				JSON_FAIL_F(ctx, "index %u", i);
-		return true;
-	}
+    template<typename T, size_t sz>
+    bool deserializeJson(std::array<T, sz> &f, const Json::Value &data, DeserializationContext *ctx = nullptr)
+    {
+        if (!data.isArray()) JSON_FAIL_TY(data, ctx, "array");
+        if (data.size() != sz) JSON_FAIL_F(ctx, "wrong size: expected %u, got %u", sz, data.size());
+        for (u32 i = 0; i < sz; i++)
+            if (!deserializeJson(f[i], data[i], ctx))
+                JSON_FAIL_F(ctx, "index %u", i);
+        return true;
+    }
 
-	template<>
-	inline bool deserializeJson(bool &f, const Json::Value &data, DeserializationContext *ctx)
-	{
-		if (!data.isBool()) JSON_FAIL_TY(data, ctx, "bool");
-		f = data.asBool();
-		return true;
-	}
+    template<>
+    inline bool deserializeJson(bool &f, const Json::Value &data, DeserializationContext *ctx)
+    {
+        if (!data.isBool()) JSON_FAIL_TY(data, ctx, "bool");
+        f = data.asBool();
+        return true;
+    }
 
-	template<>
-	inline bool deserializeJson(Json::Value &f, const Json::Value &data, DeserializationContext *ctx)
-	{
-		f = data;
-		return true;
-	}
+    template<>
+    inline bool deserializeJson(Json::Value &f, const Json::Value &data, DeserializationContext *ctx)
+    {
+        f = data;
+        return true;
+    }
 
-	template<>
-	inline bool deserializeJson(u32 &f, const Json::Value &data, DeserializationContext *ctx)
-	{
-		if (!data.isIntegral()) JSON_FAIL_TY(data, ctx, "integral");
-		f = data.asUInt();
-		return true;
-	}
+    template<>
+    inline bool deserializeJson(u32 &f, const Json::Value &data, DeserializationContext *ctx)
+    {
+        if (!data.isIntegral()) JSON_FAIL_TY(data, ctx, "integral");
+        f = data.asUInt();
+        return true;
+    }
 
-	template<>
-	inline bool deserializeJson(i32 &f, const Json::Value &data, DeserializationContext *ctx)
-	{
-		if (!data.isIntegral()) JSON_FAIL_TY(data, ctx, "integral");
-		f = data.asInt();
-		return true;
-	}
+    template<>
+    inline bool deserializeJson(i32 &f, const Json::Value &data, DeserializationContext *ctx)
+    {
+        if (!data.isIntegral()) JSON_FAIL_TY(data, ctx, "integral");
+        f = data.asInt();
+        return true;
+    }
 
-	template<>
-	inline bool deserializeJson(f32 &f, const Json::Value &data, DeserializationContext *ctx)
-	{
-		if (!data.isNumeric()) JSON_FAIL_TY(data, ctx, "numeric");
-		f = data.asFloat();
-		return true;
-	}
+    template<>
+    inline bool deserializeJson(f32 &f, const Json::Value &data, DeserializationContext *ctx)
+    {
+        if (!data.isNumeric()) JSON_FAIL_TY(data, ctx, "numeric");
+        f = data.asFloat();
+        return true;
+    }
 
-	template<>
-	inline bool deserializeJson(f64 &f, const Json::Value &data, DeserializationContext *ctx)
-	{
-		if (!data.isNumeric()) JSON_FAIL_TY(data, ctx, "numeric");
-		f = data.asDouble();
-		return true;
-	}
+    template<>
+    inline bool deserializeJson(f64 &f, const Json::Value &data, DeserializationContext *ctx)
+    {
+        if (!data.isNumeric()) JSON_FAIL_TY(data, ctx, "numeric");
+        f = data.asDouble();
+        return true;
+    }
 
-	template<>
+    template<>
 	inline bool deserializeJson(std::string &f, const Json::Value &data, DeserializationContext *ctx)
 	{
 		if (!data.isString()) JSON_FAIL_TY(data, ctx, "string");
