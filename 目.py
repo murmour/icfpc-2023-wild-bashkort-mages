@@ -69,17 +69,6 @@ coord_label = tk.Label(root)
 coord_label.place(x=0, y=0)
 
 
-# score_label = tk.Label(root)
-# score_label.place(x=0, y=25)
-
-
-# def set_score(score) -> None:
-#     if score is None:
-#         score_label.config(text=f'score: -')
-#     else:
-#         score_label.config(text=f'score: {score}')
-
-
 def tk_color_from_rgba(rgba) -> str:
     (r, g, b, _) = rgba
     return f'#{r:02x}{g:02x}{b:02x}'
@@ -93,7 +82,6 @@ def project(x: float, y: float) -> tuple[float, float]:
 
 
 def unproject(x: float, y: float) -> tuple[float, float]:
-    # todo: handl_boxe zoom
     ch = canvas.winfo_height()
     y = ch-y
     return (x/pixel_size, y/pixel_size)
@@ -267,7 +255,7 @@ def on_wheel_up(event):
     canvas.scale('all', xx, yy, factor, factor)
 
 
-# root.bind("<MouseWheel>", mouse_wheel)
+# Windows: root.bind("<MouseWheel>", mouse_wheel)?
 root.bind("<Button-5>", on_wheel_down)
 root.bind("<Button-4>", on_wheel_up)
 

@@ -1,12 +1,10 @@
 
 import os
 import io
-import re
 import sys
 import subprocess
 import json
 import time
-import shutil
 
 
 api = 'https://api.icfpcontest.com'
@@ -17,6 +15,7 @@ api_key = (
 )
 
 prob_count = 90
+dry_run = True
 
 
 def all_prob_ids() -> list[int]:
@@ -51,6 +50,9 @@ def get_prob(prob_id: int) -> dict:
 
 
 def save_prob(prob_id: int, prob: dict) -> None:
+    if dry_run:
+        print(f'dry run protection')
+        return
     fname = get_prob_path(prob_id)
     with io.open(fname, 'w') as f:
         f.write(json.dumps(prob))
@@ -185,7 +187,7 @@ def send_all_best_lazy(userboard) -> dict:
             print(f'{prob_id}: -')
             continue
         score = get_score(prob_id, sol_tag)
-        remote_score = userboard["problems"][prob_id-1]
+        remote_score = userboard['problems'][prob_id-1]
         if remote_score is None or score > remote_score:
             print(f'{prob_id}: {score:,} > {remote_score:,}')
             send_sol_request(prob_id, sol_tag)
@@ -228,15 +230,6 @@ def print_sol_stats(print_all_sols = True) -> None:
     print(f'TOTAL = {total_score:,}')
 
 
-# solver CLI:
-# -p 1  // problem id
-# -pp path  // problem path
-# -out filename // output file name (default=stdout)
-# -timeout 120 // timeout in seconds (default = 120)
-# -s two_row // solver (two_row/border/regular)
-# -score solution_file_name // score solution and print the score to stdout (doesn't run the solver)
-
-
 def get_solver_cmd(solver_id: str, solver_args: str, prob_id: int) -> list[str]:
     prob_path = get_prob_path(prob_id)
 
@@ -273,6 +266,9 @@ def run_solver(solver_id: str, solver_args: str, prob_id: int) -> str | None:
 
 def save_sol(solver_id: str, prob_id: int, sol_tag: str, sol: dict) -> None:
     print(f'saving {solver_id}({prob_id}) as {sol_tag}')
+    if dry_run:
+        print(f'dry run protection')
+        return
     sol_dir = get_sol_dir_path(prob_id)
     sol_path = f'{sol_dir}/{sol_tag}.solution'
     with io.open(sol_path, 'wb') as h:
@@ -418,8 +414,10 @@ def purge_bad_sols() -> None:
             if score == 0:
                 print(f'bad: {prob_id}.{tag}')
                 sol_path = f'{sol_dir}/{tag}.solution'
-                # эту строку нужно раскомментировать при каждом использовании:
-                # os.remove(sol_path)
+                if dry_run:
+                    print(f'dry run protection')
+                    continue
+                os.remove(sol_path)
 
 
 def patch_scores() -> None:
@@ -433,11 +431,10 @@ def patch_scores() -> None:
                     continue
                 print(f'adding score: {prob_id}.{sol_tag} = {score:,}')
                 sol['score'] = score
-                # эту строку нужно раскомментировать при каждом использовании:
-                # save_sol('patch_scores', prob_id, sol_tag, sol)
+                save_sol('patch_scores', prob_id, sol_tag, sol)
 
 
-def patch_problems_with_masks() -> None:
+def patch_probs_with_masks() -> None:
     for prob_id in all_prob_ids():
         sol = get_sol(prob_id, 'smart_1000_probe_c')
         if sol is None:
@@ -448,7 +445,6 @@ def patch_problems_with_masks() -> None:
         prob['mask'] = mask
         print(f'{prob_id}: {mask}')
         if mask != -1:
-            # эту строку нужно раскомментировать при каждом использовании:
             save_prob(prob_id, prob)
 
 
@@ -487,8 +483,7 @@ def volumize_all_sols() -> None:
             elif vol_score > score:
                 win = vol_score - score*10
                 print(f'{prob_id}.{sol_tag}: ratio: {vol_score/score}, win: {win}')
-                # эту строку нужно раскомментировать при каждом использовании:
-                # save_sol('volumize', prob_id, sol_tag, vol_sol)
+                save_sol('volumize', prob_id, sol_tag, vol_sol)
 
 
 def dp_is_best(prob_id: int) -> bool:
@@ -572,8 +567,8 @@ if __name__ == '__main__':
         patch_scores()
         exit(0)
 
-    if cmd == 'patch_problems_with_masks':
-        patch_problems_with_masks()
+    if cmd == 'patch_probs_with_masks':
+        patch_probs_with_masks()
         exit(0)
 
     if cmd == 'volumize_sols':
