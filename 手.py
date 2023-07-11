@@ -5,6 +5,7 @@ import sys
 import subprocess
 import json
 import time
+import shutil
 
 
 api = 'https://api.icfpcontest.com'
@@ -167,7 +168,6 @@ def get_best_sol_tag(prob_id) -> str | None:
         if score > best_score:
             best_score = score
             best_tag = tag
-    print(f'{prob_id}: {best_tag} ({best_score:,})')
     return best_tag
 
 
@@ -180,14 +180,14 @@ def send_all_best() -> dict:
         send_sol_request(prob_id, sol_tag)
 
 
-def send_all_best_lazy(userboard) -> dict:
+def send_all_best_lazy(ub) -> dict:
     for prob_id in all_prob_ids():
         sol_tag = get_best_sol_tag(prob_id)
         if sol_tag is None:
             print(f'{prob_id}: -')
             continue
         score = get_score(prob_id, sol_tag)
-        remote_score = userboard['problems'][prob_id-1]
+        remote_score = ub['problems'][prob_id-1]
         if remote_score is None or score > remote_score:
             print(f'{prob_id}: {score:,} > {remote_score:,}')
             send_sol_request(prob_id, sol_tag)
@@ -204,30 +204,45 @@ def print_prob_stats(prob_id: int) -> dict:
     print(f'  stage_size: {p["stage_width"]}x{p["stage_height"]}')
 
 
-def print_sol_stats(print_all_sols = True) -> None:
+def print_sol_stats() -> None:
     total_score = 0
     for prob_id in all_prob_ids():
-        if print_all_sols:
-            print(f'{prob_id}:')
+        print(f'{prob_id}:')
         sol_tags = get_sol_tags(prob_id)
         best = None
         best_score = 0
         for tag in sol_tags:
             score = get_score(prob_id, tag)
-            if print_all_sols:
-                print(f'  {tag} = {score:,}')
+            print(f'  {tag} = {score:,}')
             if best is None or score > best_score:
                 best = tag
                 best_score = score
 
         if best is not None:
-            if print_all_sols:
-                print(f'  BEST = {best}({best_score:,})')
-            else:
-                print(f'{prob_id}: {best}({best_score:,})')
+            print(f'  BEST = {best}({best_score:,})')
             total_score += max(best_score, 0)
     print()
     print(f'TOTAL = {total_score:,}')
+
+
+def print_best_sols() -> None:
+    total_score = 0
+    for prob_id in all_prob_ids():
+        sol_tag = get_best_sol_tag(prob_id)
+        score = get_score(prob_id, sol_tag)
+        print(f'{prob_id}: {sol_tag}({score:,})')
+        total_score += max(score, 0)
+    print()
+    print(f'TOTAL = {total_score:,}')
+
+
+def save_best_sols() -> None:
+    os.mkdir('best')
+    for prob_id in all_prob_ids():
+        sol_tag = get_best_sol_tag(prob_id)
+        sol_path = get_sol_path(prob_id, sol_tag)
+        os.mkdir(f'best/{prob_id}')
+        shutil.copyfile(sol_path, f'best/{prob_id}/{sol_tag}.solution')
 
 
 def get_solver_cmd(solver_id: str, solver_args: str, prob_id: int) -> list[str]:
@@ -539,11 +554,15 @@ if __name__ == '__main__':
         exit(0)
 
     if cmd == 'get_sol_stats':
-        print_sol_stats(print_all_sols = True)
+        print_sol_stats()
         exit(0)
 
     if cmd == 'get_best_sols':
-        print_sol_stats(print_all_sols = False)
+        print_best_sols()
+        exit(0)
+
+    if cmd == 'save_best_sols':
+        save_best_sols()
         exit(0)
 
     if cmd == 'get_sorted_scores':
