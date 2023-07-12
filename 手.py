@@ -421,6 +421,29 @@ def update_username_request(username: str) -> None:
     assert('Success' in res_js)
 
 
+def send_code_request(filename: str) -> None:
+    res = subprocess.check_output([
+        'curl',
+        '--compressed',
+        '-H', f'Authorization: Bearer {api_key}',
+        f'{api}/submit_code',
+        '-F', f'code=@{filename}'
+    ])
+    time.sleep(1)
+    print(res)
+
+
+def check_code_request() -> None:
+    res = subprocess.check_output([
+        'curl',
+        '--compressed',
+        '-H', f'Authorization: Bearer {api_key}',
+        f'{api}/submit_code',
+    ])
+    time.sleep(1)
+    print(res)
+
+
 def purge_bad_sols() -> None:
     for prob_id in all_prob_ids():
         sol_dir = get_sol_dir_path(prob_id)
@@ -606,6 +629,14 @@ if __name__ == '__main__':
 
     if cmd == 'update_username':
         update_username_request("WILD BASHKORT MAGES")
+        exit(0)
+
+    if cmd == 'send_code':
+        send_code_request('icfpc-2023-wbm.zip')
+        exit(0)
+
+    if cmd == 'check_sent_code':
+        check_code_request()
         exit(0)
 
     print(f'invalid command: {cmd}')
