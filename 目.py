@@ -87,13 +87,6 @@ def unproject(x: float, y: float) -> tuple[float, float]:
     return (x/pixel_size, y/pixel_size)
 
 
-def on_mouse_move(event) -> None:
-    (x, y) = unproject(event.x, event.y)
-    coord_label.config(text=f'x: {x}, y: {y}')
-
-canvas.bind("<Motion>", on_mouse_move)
-
-
 def draw_dot(x, y, fill, tag) -> None:
     canvas.create_rectangle(
         x-1, y-1, x+1, y+1,
@@ -228,20 +221,6 @@ def on_resize(event) -> None:
 canvas.bind('<Configure>', on_resize)
 
 
-def on_click1(event) -> None:
-    xx = canvas.canvasx(event.x)
-    yy = canvas.canvasy(event.y)
-    canvas.scale('all', xx, yy, 1.1, 1.1)
-
-canvas.bind("<Button-1>", on_click1)
-
-
-def on_click2(event) -> None:
-    draw_all()
-
-canvas.bind("<Button-3>", on_click2)
-
-
 def on_wheel_down(event):
     xx = canvas.canvasx(event.x)
     yy = canvas.canvasy(event.y)
@@ -258,6 +237,33 @@ def on_wheel_up(event):
 # Windows: root.bind("<MouseWheel>", mouse_wheel)?
 root.bind("<Button-5>", on_wheel_down)
 root.bind("<Button-4>", on_wheel_up)
+
+
+panning = False
+last_x = 0
+last_y = 0
+
+
+def on_click1(event):
+    global panning
+    panning = not panning
+
+root.bind("<Button-1>", on_click1)
+
+
+def on_mouse_move(event) -> None:
+    global last_x, last_y
+    x = canvas.canvasx(event.x)
+    y = canvas.canvasy(event.y)
+    if panning:
+        canvas.move('all', x-last_x, y-last_y)
+    last_x = x
+    last_y = y
+
+    (x, y) = unproject(x, y)
+    coord_label.config(text=f'x: {x}, y: {y}')
+
+canvas.bind("<Motion>", on_mouse_move)
 
 
 def update_top_label() -> None:
